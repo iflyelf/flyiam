@@ -21,14 +21,21 @@ import (
 )
 
 var (
-	configFile = flag.String("c", "etc/config.yaml", "配置文件路径")
-	Version    = "dev"
-	BuildTime  = "unknown"
-	GitCommit  = "unknown"
+	configFile  = flag.String("c", "etc/config.yaml", "配置文件路径")
+	showVersion = flag.Bool("version", false, "显示版本号并退出")
+	Version     = "dev"
+	BuildTime   = "unknown"
+	GitCommit   = "unknown"
 )
 
 func main() {
 	flag.Parse()
+
+	// 显示版本号并退出
+	if *showVersion {
+		fmt.Printf("flyiam version %s (commit %s, built %s)\n", Version, GitCommit, BuildTime)
+		return
+	}
 
 	// 加载配置
 	var c config.Config

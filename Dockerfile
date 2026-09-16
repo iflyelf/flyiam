@@ -249,19 +249,7 @@ RUN set -eux && \
     # 验证版本
     go version
 
-# ***** 编译前端 *****
-WORKDIR /src/web
-COPY web/package*.json ./
-RUN npm config set registry https://registry.npmmirror.com && \
-    npm ci --production=false && \
-    rm -rf /tmp/*
-
-COPY web/ ./
-RUN npm run build && \
-    rm -rf /tmp/*
-
-# ***** 编译 flyiam *****
-# CGO_ENABLED=0 生成纯静态二进制; VERSION/BUILD_TIME/GIT_COMMIT 注入版本信息
+# ***** 复制源码 *****
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/root/.cache/go-build \
@@ -270,21 +258,32 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
-COPY --from=0 /src/web/dist ./web/dist
+COPY web/ ./web/
 
+# ***** 编译前端 *****
+# vite outDir = ../internal/pkg/web/dist, 构建结果供 Go embed 使用
+WORKDIR /src/web
+RUN set -eux && \
+    npm config set registry https://registry.npmmirror.com && \
+    npm ci --production=false && \
+    npm run build && \
+    rm -rf /tmp/*
+
+# ***** 编译 flyiam *****
+# CGO_ENABLED=0 生成纯静态二进制; VERSION/BUILD_TIME/GIT_COMMIT 注入版本信息
+WORKDIR /src
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/opt/golang/pkg/mod \
     set -eux && \
     CGO_ENABLED=0 go build -trimpath \
-        -ldflags "-s -w -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.gitCommit=${GIT_COMMIT}" \
+        -ldflags "-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}" \
         -o /usr/local/bin/flyiam ./cmd/api && \
     /usr/local/bin/flyiam --version
 
 # ***** 创建非 root 用户 *****
 RUN groupadd -g 1000 flyiam && \
     useradd -u 1000 -g flyiam -s /bin/zsh -m flyiam && \
-    mkdir -p /app/config /app/logs /app/web/dist && \
-    cp -r /src/web/dist/* /app/web/dist/ && \
+    mkdir -p /app/config /app/logs && \
     chown -R flyiam:flyiam /app
 
 # ***** 运行配置 *****
