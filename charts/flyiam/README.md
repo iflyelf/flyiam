@@ -82,8 +82,8 @@ charts/flyiam/
 | `FLYIAM_REDIS_HOST` / `FLYIAM_REDIS_PASSWORD` | 缓存 | - |
 | `FLYIAM_JWT_SECRET` | JWT 密钥 | - |
 | `FLYIAM_ADMIN_PASSWORD` | 管理员密码 | - |
-| `FLYIAM_CASDOOR_ENDPOINT` | Casdoor 内网地址 | `http://casdoor:8000` |
-| `FLYIAM_CASDOOR_PUBLIC_ENDPOINT` | Casdoor 浏览器地址 | - |
+| `FLYIAM_CASDOOR_ENDPOINT` | Casdoor 后端地址（集群内） | `http://casdoor:8000` |
+| `FLYIAM_CASDOOR_PUBLIC_ENDPOINT` | Casdoor 浏览器地址（外置域名，标准端口 80/443） | - |
 | `FLYIAM_CASDOOR_AUTO_SETUP` | 自动初始化 Casdoor | `true` |
 | `FLYIAM_CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码 | `ysyh!9Sky` |
 | `CASDOOR_ENABLED` | 部署内置 Casdoor | `true` |
@@ -91,6 +91,19 @@ charts/flyiam/
 | `CASDOOR_TIMEZONE` | Casdoor 时区 | `Asia/Shanghai` |
 
 > Chart 仅暴露 ClusterIP Service，不包含 Ingress；域名/HTTPS 请在集群入口层（Ingress Controller / Gateway）统一配置。
+
+### 外置域名访问 Casdoor
+
+集群入口以域名暴露 Casdoor 时，`FLYIAM_CASDOOR_PUBLIC_ENDPOINT` 填写域名即可，
+**默认走标准端口，无需显式书写端口号**：
+
+```
+https://casdoor.example.com   → 443
+http://casdoor.example.com    → 80
+```
+
+非标准端口才需写成 `https://casdoor.example.com:8443`。该地址同时写入内置 Casdoor 的
+`origin`（app.conf），用于生成正确的登录跳转地址。
 
 ## 安装后验证
 
@@ -133,7 +146,7 @@ helmfile sync
 | Pod CrashLoopBackOff | `kubectl logs` 查看；确认数据库可达、`JWT_SECRET` 与 `ADMIN_PASSWORD` 已设置 |
 | Casdoor 未就绪 | FlyIAM 启动时会等待 Casdoor（最多 60s），确认 Casdoor Pod 正常 |
 | 登录报 Redirect URI 错误 | 开启 `FLYIAM_CASDOOR_AUTO_REDIRECT_URI=true` 或手工加入白名单 |
-| 浏览器跳转 localhost | 设置 `FLYIAM_CASDOOR_PUBLIC_ENDPOINT` 为浏览器可达地址 |
+| 浏览器跳转 localhost | 设置 `FLYIAM_CASDOOR_PUBLIC_ENDPOINT` 为浏览器可达的外置域名（标准端口 80/443） |
 
 ## 更多文档
 

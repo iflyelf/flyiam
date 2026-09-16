@@ -113,9 +113,16 @@ casdoorResourcesLimitsCpu: '{{ env "CASDOOR_RES_LIM_CPU" | default "1" }}'
 casdoorResourcesLimitsMemory: '{{ env "CASDOOR_RES_LIM_MEM" | default "1Gi" }}'
 
 # ==================== Casdoor 应用对接配置（FlyIAM → Casdoor）====================
-# Casdoor 服务地址（Pod 内访问；内置部署时默认指向 Chart 内 casdoor Service）
+# Casdoor 服务地址（后端访问）
+#   - 集群内方式（默认）：http://casdoor:8000（指向 Chart 内 casdoor Service）
+#   - 外置域名方式：https://casdoor.example.com（标准端口 443）/ http://casdoor.example.com（标准端口 80）
+#     标准端口无需显式书写端口号
 casdoorEndpoint: '{{ env "FLYIAM_CASDOOR_ENDPOINT" | default "http://casdoor:8000" }}'
-# Casdoor 公开地址（浏览器访问；跨域名部署时必填，留空则用访问域名）
+# Casdoor 公开地址（浏览器访问；跨域名 / 外置域名部署时填写，留空则回退为 casdoorEndpoint）
+#   外置域名默认使用标准端口，无需显式书写端口号：
+#     https://casdoor.example.com  → 443
+#     http://casdoor.example.com   → 80
+#   同时作为内置 Casdoor 的 origin（app.conf），用于生成正确的登录跳转地址
 casdoorPublicEndpoint: '{{ env "FLYIAM_CASDOOR_PUBLIC_ENDPOINT" | default "" }}'
 # 应用凭据：留空则由程序自动创建并持久化（推荐）
 casdoorClientId: '{{ env "FLYIAM_CASDOOR_CLIENT_ID" | default "" }}'

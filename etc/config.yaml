@@ -64,7 +64,8 @@ Casdoor:
   # 后端访问 Casdoor 的地址（容器内网地址，如 http://casdoor:8000）
   Endpoint: ""                        # （环境变量: CASDOOR_ENDPOINT）
   
-  # 浏览器访问 Casdoor 的地址（跨域名部署时必填，留空则用访问域名）
+  # 浏览器访问 Casdoor 的地址（跨域名 / 外置域名部署时必填，留空则用访问域名）
+  # 外置域名默认使用标准端口，无需显式书写端口号：https://casdoor.example.com → 443，http://casdoor.example.com → 80
   PublicEndpoint: ""                  # （环境变量: CASDOOR_PUBLIC_ENDPOINT）
   
   # 应用凭据：留空则由程序自动在 Casdoor 中创建并持久化（推荐）

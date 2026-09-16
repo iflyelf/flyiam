@@ -94,8 +94,8 @@ cd web && npm install && npm run dev
 | `JWT_SECRET` | JWT 密钥（必填，≥32 位） | — |
 | `ADMIN_PASSWORD` | 管理员密码（必填） | — |
 | `REDIS_ENABLED` / `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` | 缓存 | `true` / `localhost` / `6379` / 空 |
-| `CASDOOR_ENDPOINT` | Casdoor 内网地址 | `http://casdoor:8000` |
-| `CASDOOR_PUBLIC_ENDPOINT` | Casdoor 浏览器地址 | 空 |
+| `CASDOOR_ENDPOINT` | Casdoor 后端地址（集群内） | `http://casdoor:8000` |
+| `CASDOOR_PUBLIC_ENDPOINT` | Casdoor 浏览器地址（外置域名，标准端口 80/443） | 空 |
 | `CASDOOR_AUTO_SETUP` | 自动初始化 Casdoor | `true` |
 | `CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码 | `ysyh!9Sky` |
 | `CASDOOR_COUNTRY_CODE` | 手机号区域 | `CN` |

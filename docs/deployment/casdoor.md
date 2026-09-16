@@ -32,9 +32,23 @@ FlyIAM 登录回调：`http(s)://<FlyIAM 域名>:<端口>/api/auth/callback`
 - 若报错 `Redirect URI ... doesn't exist in the allowed Redirect URI list`，
   说明自动追加被关闭且白名单缺失，请开启自动追加或到 Casdoor 应用页手工添加。
 
+### 外置域名访问（标准端口）
+
+Casdoor 通过集群入口（Ingress Controller / Gateway）以域名对外暴露时，
+`FLYIAM_CASDOOR_PUBLIC_ENDPOINT` 直接填写域名即可，**默认走标准端口**：
+
+```
+https://casdoor.example.com   → 443
+http://casdoor.example.com    → 80
+```
+
+标准端口无需显式书写端口号；仅当使用非标准端口时才需写成 `https://casdoor.example.com:8443`。
+该地址同时写入内置 Casdoor 的 `origin`（app.conf），用于生成正确的登录跳转地址。
+
 ## 3. 手动配置（可选）
 
-如需手工维护，登录 Casdoor 管理后台（`http://<casdoor>:8000`，默认 `admin/123`，**首次登录请立即修改**）：
+如需手工维护，登录 Casdoor 管理后台（集群内 `http://<casdoor>:8000`，
+或外置域名 `https://casdoor.example.com`，默认 `admin/ysyh!9Sky`，**首次登录请立即修改**）：
 
 1. **组织**：创建组织 `flyiam`（语言选中文，地区选中国）；
 2. **应用**：创建应用 `flyiam`
@@ -51,8 +65,8 @@ FlyIAM 登录回调：`http(s)://<FlyIAM 域名>:<端口>/api/auth/callback`
 
 | 配置 | 环境变量 | 默认 |
 |------|---------|------|
-| Casdoor 内网地址 | `CASDOOR_ENDPOINT` / `FLYIAM_CASDOOR_ENDPOINT` | `http://casdoor:8000` |
-| Casdoor 浏览器地址 | `FLYIAM_CASDOOR_PUBLIC_ENDPOINT` | 空（用访问域名） |
+| Casdoor 后端地址（集群内） | `CASDOOR_ENDPOINT` / `FLYIAM_CASDOOR_ENDPOINT` | `http://casdoor:8000` |
+| Casdoor 浏览器地址（外置域名） | `FLYIAM_CASDOOR_PUBLIC_ENDPOINT` | 空（用访问域名；外置域名标准端口 80/443） |
 | 应用 Client ID | `FLYIAM_CASDOOR_CLIENT_ID` | 空（自动创建） |
 | 应用 Client Secret | `FLYIAM_CASDOOR_CLIENT_SECRET` | 空（自动创建） |
 | 组织名 | `FLYIAM_CASDOOR_ORGANIZATION` | `flyiam` |
@@ -73,7 +87,7 @@ Casdoor 首次启动会自动创建其全部表，无需手工执行 SQL。
 | 现象 | 原因与处理 |
 |------|-----------|
 | `Redirect URI ... doesn't exist` | 开启自动追加回调（`CASDOOR_AUTO_REDIRECT_URI=true`）或手工加入白名单 |
-| 浏览器跳转 `localhost:8000` 打不开 | 设置 `FLYIAM_CASDOOR_PUBLIC_ENDPOINT` 为浏览器可达地址 |
+| 浏览器跳转 `localhost:8000` 打不开 | 设置 `FLYIAM_CASDOOR_PUBLIC_ENDPOINT` 为浏览器可达的外置域名（标准端口 80/443） |
 | 登录后回到登录页 | 查看 FlyIAM 日志中 `/api/auth/callback` 报错 |
 | 手机号校验失败 | 确认 `FLYIAM_CASDOOR_COUNTRY_CODE=CN`（组织默认区域影响手机号解析） |
 | 自动初始化失败 | 确认 Casdoor 已就绪且 `casdoor_application` 中存在 `app-built-in` |

@@ -42,8 +42,11 @@ export FLYIAM_ADMIN_PASSWORD="your-admin-password"
 export FLYIAM_REDIS_HOST="redis.default.svc.cluster.local"
 export FLYIAM_REDIS_PASSWORD="your-redis-password"
 
-# 可选：对外访问地址（跨域名部署必填）
-export FLYIAM_CASDOOR_PUBLIC_ENDPOINT="http://flyiam.example.com:8000"
+# 可选：Casdoor 浏览器访问地址（外置域名 / 跨域名部署时填写）
+#   外置域名默认使用标准端口，无需显式书写端口号：
+#     https://casdoor.example.com  → 443
+#     http://casdoor.example.com   → 80
+export FLYIAM_CASDOOR_PUBLIC_ENDPOINT="https://casdoor.example.com"
 
 # 部署
 helmfile sync
@@ -86,8 +89,8 @@ Casdoor 与 FlyIAM **共用同一数据库**（表前缀 `casdoor_`），
 | `FLYIAM_REDIS_HOST` | Redis 地址 | `redis.default.svc.cluster.local` |
 | `FLYIAM_JWT_SECRET` | JWT 密钥（≥32 位） | - |
 | `FLYIAM_ADMIN_PASSWORD` | 管理员密码 | - |
-| `FLYIAM_CASDOOR_ENDPOINT` | Casdoor 内网地址 | `http://casdoor:8000` |
-| `FLYIAM_CASDOOR_PUBLIC_ENDPOINT` | Casdoor 浏览器地址 | - |
+| `FLYIAM_CASDOOR_ENDPOINT` | Casdoor 后端地址（集群内） | `http://casdoor:8000` |
+| `FLYIAM_CASDOOR_PUBLIC_ENDPOINT` | Casdoor 浏览器地址（外置域名，标准端口 80/443） | - |
 | `FLYIAM_CASDOOR_AUTO_SETUP` | 自动初始化 Casdoor | `true` |
 | `FLYIAM_CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码 | `ysyh!9Sky` |
 | `FLYIAM_CASDOOR_COUNTRY_CODE` | 手机号区域 | `CN` |
@@ -104,9 +107,11 @@ kubectl port-forward -n flyiam svc/casdoor 8000:8000
 # 浏览器访问 http://localhost:8000
 ```
 
-> 通过集群入口（Ingress Controller / Gateway）暴露时，需将 Casdoor 对外地址填入
-> `FLYIAM_CASDOOR_PUBLIC_ENDPOINT`；FlyIAM 登录时会自动把回调地址加入 Casdoor 应用白名单
-> （`FLYIAM_CASDOOR_AUTO_REDIRECT_URI`）。
+> **外置域名访问**：通过集群入口（Ingress Controller / Gateway）以域名暴露 Casdoor 时，
+> 将 `FLYIAM_CASDOOR_PUBLIC_ENDPOINT` 设为该域名（默认走标准端口 **443(https) / 80(http)**，
+> 无需显式书写端口号，例如 `https://casdoor.example.com`）。
+> 该地址同时作为内置 Casdoor 的 `origin`，用于生成正确的登录跳转地址。
+> FlyIAM 登录时会自动把回调地址加入 Casdoor 应用白名单（`FLYIAM_CASDOOR_AUTO_REDIRECT_URI`）。
 
 ## 7. 验证
 
