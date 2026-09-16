@@ -24,7 +24,7 @@ imageRepository: '{{ env "FLYIAM_IMAGE_REPOSITORY" | default "iflyelf/flyiam" }}
 # FlyIAM 镜像标签
 imageTag: '{{ env "FLYIAM_IMAGE_TAG" | default "latest" }}'
 # 镜像拉取策略
-imagePullPolicy: '{{ env "FLYIAM_IMAGE_PULL_POLICY" | default "IfNotPresent" }}'
+imagePullPolicy: '{{ env "FLYIAM_IMAGE_PULL_POLICY" | default "Always" }}'
 
 # ==================== 服务端口配置 ====================
 # FlyIAM 服务端口
