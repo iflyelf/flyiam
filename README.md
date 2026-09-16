@@ -52,7 +52,8 @@ docker compose up -d
 
 # 应用：http://localhost:8081
 # Casdoor：http://localhost:8000
-# 默认管理员：admin / ysyh!9Sky
+# Casdoor 内置管理员：admin / 123（上游硬编码，与 CASDOOR_DEFAULT_PASSWORD 无关）
+# FlyIAM 业务管理员：flyiam/admin / ysyh!9Sky（密码取 CASDOOR_DEFAULT_PASSWORD）
 ```
 
 ### Kubernetes

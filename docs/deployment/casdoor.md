@@ -65,7 +65,12 @@ helmfile -f helmfile.yaml.gotmpl sync
 ## 3. 手动配置（可选）
 
 如需手工维护，登录 Casdoor 管理后台（集群内 `http://<casdoor>:8000`，
-或外置域名 `https://casdoor.example.com`，默认 `admin/ysyh!9Sky`，**首次登录请立即修改**）：
+或外置域名 `https://casdoor.example.com`）：
+
+> **登录账号说明**：
+> - **Casdoor 内置管理员**：`built-in/admin`，密码固定为 **`123`**（Casdoor 上游源码硬编码创建，
+>   与 `CASDOOR_DEFAULT_PASSWORD` 无关，**首次登录请立即修改**）；
+> - **业务组织管理员**：`flyiam/admin`，密码为 `CASDOOR_DEFAULT_PASSWORD`（默认 `ysyh!9Sky`）。
 
 1. **组织**：创建组织 `flyiam`（语言选中文，地区选中国）；
 2. **应用**：创建应用 `flyiam`
@@ -89,7 +94,8 @@ helmfile -f helmfile.yaml.gotmpl sync
 | 组织名 | `FLYIAM_CASDOOR_ORGANIZATION` | `flyiam` |
 | 应用名 | `FLYIAM_CASDOOR_APPLICATION` | `flyiam` |
 | 证书名 | `FLYIAM_CASDOOR_CERTIFICATE` | `cert-built-in` |
-| 默认密码 | `FLYIAM_CASDOOR_DEFAULT_PASSWORD` | `ysyh!9Sky` |
+| 默认密码（业务组织管理员/新用户） | `FLYIAM_CASDOOR_DEFAULT_PASSWORD` | `ysyh!9Sky` |
+| 内置管理员密码（不可配，上游硬编码） | - | `123` |
 | 手机号区域 | `FLYIAM_CASDOOR_COUNTRY_CODE` | `CN` |
 | 自动初始化 | `FLYIAM_CASDOOR_AUTO_SETUP` | `true` |
 | 自动追加回调 | `FLYIAM_CASDOOR_AUTO_REDIRECT_URI` | `true` |
@@ -108,3 +114,5 @@ Casdoor 首次启动会自动创建其全部表，无需手工执行 SQL。
 | 登录后回到登录页 | 查看 FlyIAM 日志中 `/api/auth/callback` 报错 |
 | 手机号校验失败 | 确认 `FLYIAM_CASDOOR_COUNTRY_CODE=CN`（组织默认区域影响手机号解析） |
 | 自动初始化失败 | 确认 Casdoor 已就绪且 `casdoor_application` 中存在 `app-built-in` |
+| 修改了 `CASDOOR_DEFAULT_PASSWORD` 但 Casdoor 登录仍为 `123` | `123` 是 Casdoor 内置管理员 `built-in/admin` 的硬编码密码，不受配置影响；业务管理员请用 `flyiam/admin` + 配置的默认密码登录 |
+| 不知道 Casdoor 后台登录密码 | 内置管理员 `admin` / `123`（首次登录请立即修改） |
