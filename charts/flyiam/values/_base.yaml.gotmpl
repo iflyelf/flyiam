@@ -102,8 +102,8 @@ casdoorInitImageRegistry: '{{ env "CASDOOR_INIT_IMAGE_REGISTRY" | default "docke
 casdoorInitImageRepository: '{{ env "CASDOOR_INIT_IMAGE_REPOSITORY" | default "library/busybox" }}'
 casdoorInitImageTag: '{{ env "CASDOOR_INIT_IMAGE_TAG" | default "1.36" }}'
 casdoorInitImagePullPolicy: '{{ env "CASDOOR_INIT_IMAGE_PULL_POLICY" | default "IfNotPresent" }}'
-# 副本数（Casdoor 有状态，建议单副本）
-casdoorReplicas: {{ env "CASDOOR_REPLICAS" | default "1" }}
+# 副本数（Casdoor 有状态，默认 2；如需单副本可设为 1）
+casdoorReplicas: {{ env "CASDOOR_REPLICAS" | default "2" }}
 # Service 与端口
 casdoorServiceName: '{{ env "CASDOOR_SERVICE_NAME" | default "casdoor" }}'
 casdoorServicePort: {{ env "CASDOOR_SERVICE_PORT" | default "8000" }}

@@ -103,7 +103,7 @@ export FLYIAM_NODE_LABEL_VALUE="true"
 |----|------|---------|
 | 镜像 | `casbin/casdoor:latest` | `CASDOOR_IMAGE_TAG` |
 | initContainer 镜像 | `busybox:1.36` | `CASDOOR_INIT_IMAGE_TAG` |
-| 副本数 | `1` | `CASDOOR_REPLICAS` |
+| 副本数 | `2` | `CASDOOR_REPLICAS` |
 | 端口 | `8000` | `CASDOOR_SERVICE_PORT` |
 | 时区 | `Asia/Shanghai` | `CASDOOR_TIMEZONE` |
 | 运行模式 | `prod` | `CASDOOR_RUN_MODE` |

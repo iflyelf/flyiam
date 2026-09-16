@@ -70,10 +70,10 @@ charts/flyiam/
 
 | 环境 | 命名空间 | 副本数 | Casdoor |
 |------|---------|--------|---------|
-| default | flyiam | 2 | 1 |
+| default | flyiam | 2 | 2 |
 | dev | flyiam-dev | 1 | 1 |
-| staging | flyiam-staging | 2 | 1 |
-| prod | flyiam | 3 | 1 |
+| staging | flyiam-staging | 2 | 2 |
+| prod | flyiam | 3 | 2 |
 
 ## 关键配置
 
@@ -95,7 +95,7 @@ charts/flyiam/
 | `FLYIAM_CASDOOR_AUTO_SETUP` | 自动初始化 Casdoor | `true` |
 | `FLYIAM_CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码 | `ysyh!9Sky` |
 | `CASDOOR_ENABLED` | 部署内置 Casdoor | `true` |
-| `CASDOOR_REPLICAS` | Casdoor 副本数 | `1` |
+| `CASDOOR_REPLICAS` | Casdoor 副本数 | `2` |
 | `CASDOOR_IMAGE_TAG` | Casdoor 镜像标签 | `latest` |
 | `CASDOOR_IMAGE_PULL_POLICY` | Casdoor 镜像拉取策略 | `Always` |
 | `CASDOOR_INIT_IMAGE_TAG` | Casdoor initContainer 镜像标签（生成 app.conf） | `1.36` |
