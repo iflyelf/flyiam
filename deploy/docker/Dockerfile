@@ -281,7 +281,11 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     /usr/local/bin/flyiam --version
 
 # ***** 创建非 root 用户 *****
-RUN groupadd -g 1000 flyiam && \
+# ubuntu 基础镜像自带 UID/GID 1000 的 ubuntu 用户, 先移除以复用 1000 (避免 groupadd exit 4)
+RUN set -eux && \
+    userdel -rf ubuntu 2>/dev/null || true && \
+    groupdel ubuntu 2>/dev/null || true && \
+    groupadd -g 1000 flyiam && \
     useradd -u 1000 -g flyiam -s /bin/zsh -m flyiam && \
     mkdir -p /app/config /app/logs && \
     chown -R flyiam:flyiam /app
