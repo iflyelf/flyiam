@@ -97,6 +97,7 @@ charts/flyiam/
 | `CASDOOR_ENABLED` | 部署内置 Casdoor | `true` |
 | `CASDOOR_IMAGE_TAG` | Casdoor 镜像标签 | `latest` |
 | `CASDOOR_IMAGE_PULL_POLICY` | Casdoor 镜像拉取策略 | `Always` |
+| `CASDOOR_INIT_IMAGE_TAG` | Casdoor initContainer 镜像标签（生成 app.conf） | `1.36` |
 | `CASDOOR_TIMEZONE` | Casdoor 时区 | `Asia/Shanghai` |
 
 > Chart 仅暴露 ClusterIP Service，不包含 Ingress；域名/HTTPS 请在集群入口层（Ingress Controller / Gateway）统一配置。

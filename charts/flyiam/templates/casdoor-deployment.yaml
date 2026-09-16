@@ -36,7 +36,8 @@ spec:
       # 生成 app.conf（替换数据库密码占位符）
       initContainers:
         - name: prepare-config
-          image: busybox:1.36
+          image: "{{ .Values.casdoor.initImage.registry }}/{{ .Values.casdoor.initImage.repository }}:{{ .Values.casdoor.initImage.tag }}"
+          imagePullPolicy: {{ .Values.casdoor.initImage.pullPolicy }}
           command:
             - sh
             - -c

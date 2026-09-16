@@ -317,6 +317,12 @@ casdoor:
     repository: {{ .Values.casdoorImageRepository | quote }}
     tag: {{ .Values.casdoorImageTag | quote }}
     pullPolicy: {{ .Values.casdoorImagePullPolicy | quote }}
+  # initContainer 镜像（生成 app.conf）
+  initImage:
+    registry: {{ .Values.casdoorInitImageRegistry | quote }}
+    repository: {{ .Values.casdoorInitImageRepository | quote }}
+    tag: {{ .Values.casdoorInitImageTag | quote }}
+    pullPolicy: {{ .Values.casdoorInitImagePullPolicy | quote }}
   # 副本数（有状态服务，建议单副本）
   replicaCount: {{ .Values.casdoorReplicas }}
   # Service 配置

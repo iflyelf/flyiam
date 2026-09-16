@@ -102,6 +102,7 @@ export FLYIAM_NODE_LABEL_VALUE="true"
 | 项 | 默认 | 环境变量 |
 |----|------|---------|
 | 镜像 | `casbin/casdoor:latest` | `CASDOOR_IMAGE_TAG` |
+| initContainer 镜像 | `busybox:1.36` | `CASDOOR_INIT_IMAGE_TAG` |
 | 副本数 | `1` | `CASDOOR_REPLICAS` |
 | 端口 | `8000` | `CASDOOR_SERVICE_PORT` |
 | 时区 | `Asia/Shanghai` | `CASDOOR_TIMEZONE` |
@@ -128,6 +129,7 @@ Casdoor 与 FlyIAM **共用同一数据库**（表前缀 `casdoor_`），
 | `FLYIAM_IMAGE_TAG` | 应用镜像标签 | `latest` |
 | `FLYIAM_IMAGE_PULL_POLICY` | 应用镜像拉取策略 | `Always` |
 | `CASDOOR_IMAGE_PULL_POLICY` | Casdoor 镜像拉取策略 | `Always` |
+| `CASDOOR_INIT_IMAGE_TAG` | Casdoor initContainer 镜像标签 | `1.36` |
 | `FLYIAM_NODE_LABEL` / `FLYIAM_NODE_LABEL_VALUE` | 硬性节点亲和性标签 | `flyiam` / `true` |
 | `FLYIAM_DB_HOST` | 数据库地址 | `postgres.default.svc.cluster.local` |
 | `FLYIAM_DB_PASSWORD` | 数据库密码 | - |

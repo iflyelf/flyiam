@@ -97,6 +97,11 @@ casdoorImageRepository: '{{ env "CASDOOR_IMAGE_REPOSITORY" | default "casbin/cas
 casdoorImageTag: '{{ env "CASDOOR_IMAGE_TAG" | default "latest" }}'
 # Casdoor 镜像拉取策略
 casdoorImagePullPolicy: '{{ env "CASDOOR_IMAGE_PULL_POLICY" | default "Always" }}'
+# Casdoor initContainer 镜像（生成 app.conf，替换数据库密码占位符）
+casdoorInitImageRegistry: '{{ env "CASDOOR_INIT_IMAGE_REGISTRY" | default "docker.io" }}'
+casdoorInitImageRepository: '{{ env "CASDOOR_INIT_IMAGE_REPOSITORY" | default "library/busybox" }}'
+casdoorInitImageTag: '{{ env "CASDOOR_INIT_IMAGE_TAG" | default "1.36" }}'
+casdoorInitImagePullPolicy: '{{ env "CASDOOR_INIT_IMAGE_PULL_POLICY" | default "IfNotPresent" }}'
 # 副本数（Casdoor 有状态，建议单副本）
 casdoorReplicas: {{ env "CASDOOR_REPLICAS" | default "1" }}
 # Service 与端口
