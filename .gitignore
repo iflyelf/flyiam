@@ -1,0 +1,86 @@
+# =============================================================================
+# FlyIAM .gitignore
+#
+# 规则说明（注意“/”前缀）：
+#   - 带前导 "/" 的规则只匹配仓库根目录，避免误伤子目录同名文件夹；
+#   - 不带前导 "/" 的规则会匹配任意层级（例如 dist 会匹配 internal/pkg/web/dist）。
+# 因此构建产物目录统一使用根锚定写法，保护 internal/pkg/web/dist（Go embed 资源）。
+# =============================================================================
+
+# ---------- 编译产物 ----------
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# ---------- 构建输出（仅根目录，避免误伤 internal/pkg/web/dist）----------
+/build/
+/dist/
+*.tar.gz
+*.zip
+
+# ---------- 日志 ----------
+*.log
+
+# ---------- 依赖 ----------
+vendor/
+node_modules/
+
+# ---------- 前端 ----------
+web/.vite/
+web/coverage/
+web/dist/
+web/node_modules/
+
+# ---------- 测试覆盖率 ----------
+coverage.out
+coverage.html
+*.coverprofile
+
+# ---------- 环境变量与密钥 ----------
+.env
+.env.local
+.env.*.local
+*.kubeconfig
+secrets.yaml
+
+# ---------- 临时文件 ----------
+tmp/
+temp/
+.tmp/
+
+# ---------- 编辑器 ----------
+.idea/
+*.swp
+*.swo
+*~
+
+# ---------- 操作系统 ----------
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# ---------- npm 日志 ----------
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =============================================================================
+# 说明：以下内容需要提交，故不忽略
+#   internal/pkg/web/dist/   Go embed 前端资源（//go:embed dist）
+#   .dockerignore            Docker 构建必需
+#   .vscode/                 团队共享的项目级编辑器配置
+# =============================================================================
+
+# ---------- 数据库备份（本地导出，勿提交）----------
+/backup/
+*.sql.gz
+
+# ---------- 本地开发配置（含真实凭据，禁止提交）----------
+etc/config-local.yaml
+etc/config-local.yml
+config-local.yaml

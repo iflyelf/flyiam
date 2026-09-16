@@ -1,0 +1,188 @@
+services:
+  # ===========================================================================
+  # PostgreSQL 数据库（Casdoor 与 FlyIAM 共用，表前缀区分）
+  # ===========================================================================
+  postgres:
+    image: postgres:17-alpine
+    container_name: flyiam-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: flyiam
+      POSTGRES_USER: flyiam
+      POSTGRES_PASSWORD: flyiam_password
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - flyiam-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flyiam -d flyiam"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ===========================================================================
+  # Redis 缓存（可选，不可用时应用自动降级）
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: flyiam-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - flyiam-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ===========================================================================
+  # Casdoor 认证中心（中文 / 上海时区 / 最新镜像）
+  # 首次启动自动建表；FlyIAM 启动后自动创建组织、应用与管理员
+  # ===========================================================================
+  casdoor:
+    image: casbin/casdoor:latest
+    container_name: flyiam-casdoor
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      TZ: Asia/Shanghai
+      RUNNING_IN_DOCKER: "true"
+    # 生成 app.conf 后启动（与数据库共用 flyiam 库，表前缀 casdoor_）
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        cat > /conf/app.conf <<'EOF'
+        appname = casdoor
+        httpport = 8000
+        runmode = prod
+        showdoc = true
+        copyrequestbody = true
+
+        driverName = postgres
+        dataSourceName = host=postgres port=5432 user=flyiam password=flyiam_password dbname=flyiam sslmode=disable
+        dbName = flyiam
+        tableNamePrefix = casdoor_
+
+        sessionConfig = {"cookieName":"casdoor_session_id","gclifetime":3600,"enableSetCookie":true,"cookieLifeTime":3600,"providerConfig":"/tmp"}
+        staticBaseUrl = "https://cdn.casbin.org"
+        origin = "http://localhost:8000"
+        logPostOnly = true
+        isCloudIntranet = false
+        verificationCodeTimeout = 10
+        defaultStorageProvider = "Local File System"
+        cors_allow_origin = "*"
+        cors_allow_methods = "GET,POST,PUT,DELETE,OPTIONS"
+        cors_allow_headers = "Content-Type,Authorization"
+        cors_expose_headers = "Content-Length,Access-Control-Allow-Origin,Access-Control-Allow-Headers,Content-Type"
+        cors_allow_credentials = "true"
+
+        defaultLanguage = "zh"
+        languages = "zh,en"
+        timezone = "Asia/Shanghai"
+        EOF
+        exec /server
+    volumes:
+      - casdoor_conf:/conf
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - flyiam-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # ===========================================================================
+  # FlyIAM 应用（含嵌入前端，单端口）
+  # ===========================================================================
+  flyiam:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-dev}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    container_name: flyiam-api
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      TZ: Asia/Shanghai
+
+      # 数据库
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: flyiam
+      DB_USER: flyiam
+      DB_PASSWORD: flyiam_password
+      DB_SSLMODE: disable
+
+      # Redis
+      REDIS_ENABLED: "true"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 0
+
+      # JWT
+      JWT_SECRET: "flyiam-jwt-secret-key-for-development-only-change-me"
+      JWT_ACCESS_EXPIRE: 7200
+      JWT_REFRESH_EXPIRE: 604800
+
+      # 管理员
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ysyh!9Sky}
+      ADMIN_EMAIL: admin@example.com
+
+      # Casdoor（应用凭据留空 → 自动创建并持久化）
+      CASDOOR_ENDPOINT: http://casdoor:8000
+      CASDOOR_PUBLIC_ENDPOINT: http://localhost:8000
+      CASDOOR_ORGANIZATION: flyiam
+      CASDOOR_ORGANIZATION_DISPLAY_NAME: FlyIAM
+      CASDOOR_APPLICATION: flyiam
+      CASDOOR_APPLICATION_DISPLAY_NAME: FlyIAM
+      CASDOOR_CERTIFICATE: cert-built-in
+      CASDOOR_DEFAULT_PASSWORD: ysyh!9Sky
+      CASDOOR_COUNTRY_CODE: CN
+      CASDOOR_AUTO_SETUP: "true"
+      CASDOOR_AUTO_REDIRECT_URI: "true"
+
+      # 日志
+      LOG_LEVEL: info
+      LOG_FORMAT: json
+    depends_on:
+      postgres:
+        condition: service_healthy
+      casdoor:
+        condition: service_healthy
+    networks:
+      - flyiam-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+networks:
+  flyiam-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  casdoor_conf:

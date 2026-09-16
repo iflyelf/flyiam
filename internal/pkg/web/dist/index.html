@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f5efe6">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="alternate icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/favicon.svg">
+  <title>FlyIAM - 统一用户管理系统</title>
+  <script>
+    // 首屏应用主题，避免主题闪烁（FOUC）
+    (function () {
+      try {
+        var legacy = { light: 'warm', blue: 'cool' };
+        var t = localStorage.getItem('flyiam_theme') || localStorage.getItem('theme');
+        if (t && legacy[t]) t = legacy[t];
+        if (t !== 'warm' && t !== 'cool' && t !== 'dark') {
+          t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'warm';
+        }
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'warm');
+      }
+    })();
+  </script>
+  <script type="module" crossorigin src="/assets/index-B1jWcejD.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/vue-vendor-DeoNlAxA.js">
+  <link rel="modulepreload" crossorigin href="/assets/element-plus-zpMd3IxQ.js">
+  <link rel="stylesheet" crossorigin href="/assets/index-BugiVGBf.css">
+</head>
+<body>
+  <div id="app"></div>
+</body>
+</html>

@@ -1,0 +1,62 @@
+{{- if .Values.casdoor.enabled }}
+# =============================================================================
+# Casdoor 配置模板（app.conf）
+#
+# 说明：
+#   - 此 ConfigMap 保存带占位符 __DB_PASSWORD__ 的模板；
+#   - 由 Deployment 的 initContainer 读取后替换占位符并写入共享卷，
+#     避免在 ConfigMap 中明文保存数据库密码。
+#   - 关键配置：中文语言、上海时区、与 FlyIAM 共用数据库（表前缀 casdoor_）。
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "flyiam.fullname" . }}-casdoor-config
+  labels:
+    {{- include "flyiam.labels" . | nindent 4 }}
+    app.kubernetes.io/component: casdoor
+data:
+  app.conf.tpl: |
+    appname = casdoor
+    httpport = {{ .Values.casdoor.service.port }}
+    runmode = {{ .Values.casdoor.runMode }}
+    showdoc = true
+    copyrequestbody = true
+
+    # 数据库（与 FlyIAM 共用同一库，Casdoor 表前缀 casdoor_）
+    driverName = postgres
+    dataSourceName = host={{ .Values.casdoor.database.host }} port={{ .Values.casdoor.database.port }} user={{ .Values.casdoor.database.user }} password=__DB_PASSWORD__ dbname={{ .Values.casdoor.database.name }} sslmode={{ .Values.casdoor.database.sslMode }}
+    dbName = {{ .Values.casdoor.database.name }}
+    tableNamePrefix = {{ .Values.casdoor.database.tablePrefix }}
+
+    # 会话
+    sessionConfig = {"cookieName":"casdoor_session_id","gclifetime":3600,"enableSetCookie":true,"cookieLifeTime":3600,"providerConfig":"/tmp"}
+
+    # 静态资源
+    staticBaseUrl = "{{ .Values.casdoor.staticBaseUrl }}"
+
+    # 访问源（浏览器可达地址，跨域名部署时必填）
+    origin = "{{ .Values.casdoor.origin }}"
+
+    # 日志
+    logPostOnly = true
+    isCloudIntranet = false
+
+    # 验证码超时（分钟）
+    verificationCodeTimeout = 10
+
+    # 默认存储提供方
+    defaultStorageProvider = "Local File System"
+
+    # CORS
+    cors_allow_origin = "*"
+    cors_allow_methods = "GET,POST,PUT,DELETE,OPTIONS"
+    cors_allow_headers = "Content-Type,Authorization"
+    cors_expose_headers = "Content-Length,Access-Control-Allow-Origin,Access-Control-Allow-Headers,Content-Type"
+    cors_allow_credentials = "true"
+
+    # 国际化：默认中文
+    defaultLanguage = "zh"
+    languages = "zh,en"
+    timezone = "{{ .Values.casdoor.timezone }}"
+{{- end }}

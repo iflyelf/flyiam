@@ -1,0 +1,50 @@
+# Git
+.git/
+.gitignore
+.github/
+
+# Documentation
+*.md
+docs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
+flyiam
+flyiam-*
+dist/
+build/
+
+# Logs
+*.log
+logs/
+
+# Test files
+*_test.go
+testdata/
+
+# Kubernetes
+charts/
+deploy/kubernetes/
+
+# CI/CD
+.github/
+
+# Development
+.env
+.env.local
+*.local.yaml
+tmp/
+temp/
+
+# Go
+vendor/
+go.work
+
+# Node
+node_modules/
+.cache/

@@ -1,0 +1,208 @@
+# ============================================
+# 公共环境变量（所有环境共享的默认值）
+# ============================================
+# 说明：helmfile 各环境（default/dev/staging/prod）不会自动继承彼此的值，
+# 因此将所有环境共享的配置集中在本文件，由每个环境通过 values 引用后再叠加各自覆盖项。
+# 修改公共默认值只需编辑本文件；环境差异（命名空间、副本数等）在 helmfile.yaml 的
+# environments.<env>.values 中覆盖。
+#
+# ★ 全量环境变量覆盖：本文件所有配置项均支持通过环境变量覆盖，
+#   格式统一为 {{`{{ env "ENV_NAME" | default "默认值" }}`}}。
+#   未设置环境变量时使用默认值，无需修改文件即可通过 export 覆盖任意配置。
+
+# ==================== 基础配置 ====================
+# 命名空间
+namespace: '{{ env "FLYIAM_NAMESPACE" | default "flyiam" }}'
+# 环境标识（用于资源标签）
+environment: '{{ env "FLYIAM_ENVIRONMENT" | default "production" }}'
+
+# ==================== 镜像配置 ====================
+# FlyIAM 镜像仓库地址
+imageRegistry: '{{ env "FLYIAM_IMAGE_REGISTRY" | default "docker.io" }}'
+# FlyIAM 镜像仓库路径
+imageRepository: '{{ env "FLYIAM_IMAGE_REPOSITORY" | default "iflyelf/flyiam" }}'
+# FlyIAM 镜像标签
+imageTag: '{{ env "FLYIAM_IMAGE_TAG" | default "latest" }}'
+# 镜像拉取策略
+imagePullPolicy: '{{ env "FLYIAM_IMAGE_PULL_POLICY" | default "IfNotPresent" }}'
+
+# ==================== 服务端口配置 ====================
+# FlyIAM 服务端口
+servicePort: {{ env "FLYIAM_SERVICE_PORT" | default "8081" }}
+# 服务类型（ClusterIP / NodePort / LoadBalancer）
+serviceType: '{{ env "FLYIAM_SERVICE_TYPE" | default "ClusterIP" }}'
+
+# ==================== 副本配置 ====================
+# FlyIAM 副本数（支持多副本高可用）
+replicas: {{ env "FLYIAM_REPLICAS" | default "2" }}
+
+# ==================== 数据库配置（PostgreSQL - 外置）====================
+# 数据库类型
+dbType: '{{ env "FLYIAM_DB_TYPE" | default "postgres" }}'
+# 数据库地址
+dbHost: '{{ env "FLYIAM_DB_HOST" | default "postgres.default.svc.cluster.local" }}'
+# 数据库端口
+dbPort: {{ env "FLYIAM_DB_PORT" | default "5432" }}
+# 数据库名称
+dbName: '{{ env "FLYIAM_DB_NAME" | default "flyiam" }}'
+# 数据库用户名
+dbUser: '{{ env "FLYIAM_DB_USER" | default "flyiam" }}'
+# 数据库密码（优先从环境变量读取，生产环境建议使用 existingSecret）
+dbPassword: '{{ env "FLYIAM_DB_PASSWORD" | default "ysyh!9Sky" }}'
+# 数据库 SSL 模式
+dbSslMode: '{{ env "FLYIAM_DB_SSL_MODE" | default "disable" }}'
+# 数据库连接池配置
+dbMaxOpenConns: {{ env "FLYIAM_DB_MAX_OPEN_CONNS" | default "100" }}
+dbMaxIdleConns: {{ env "FLYIAM_DB_MAX_IDLE_CONNS" | default "10" }}
+dbConnMaxLifetime: {{ env "FLYIAM_DB_CONN_MAX_LIFETIME" | default "3600" }}
+
+# ==================== Redis 配置（外置）====================
+# 是否启用 Redis 缓存
+redisEnabled: {{ env "FLYIAM_REDIS_ENABLED" | default "true" }}
+# Redis 地址
+redisHost: '{{ env "FLYIAM_REDIS_HOST" | default "redis.default.svc.cluster.local" }}'
+# Redis 端口
+redisPort: {{ env "FLYIAM_REDIS_PORT" | default "6379" }}
+# Redis 密码（优先从环境变量读取）
+redisPassword: '{{ env "FLYIAM_REDIS_PASSWORD" | default "ysyh!9Sky" }}'
+# Redis 数据库编号
+redisDb: {{ env "FLYIAM_REDIS_DB" | default "0" }}
+# Redis 缓存 TTL（秒）
+redisCacheTtl: {{ env "FLYIAM_REDIS_CACHE_TTL" | default "300" }}
+
+# ==================== JWT 配置 ====================
+# JWT 密钥（必填，建议 32 位以上随机字符串，生产环境必须使用 existingSecret）
+jwtSecret: '{{ env "FLYIAM_JWT_SECRET" | default "ysyh!9SkyFlyIAMSecretKey2024xxxxxxxx" }}'
+# JWT Access Token 过期时间（秒，默认 2 小时）
+jwtAccessExpire: {{ env "FLYIAM_JWT_ACCESS_EXPIRE" | default "7200" }}
+# JWT Refresh Token 过期时间（秒，默认 7 天）
+jwtRefreshExpire: {{ env "FLYIAM_JWT_REFRESH_EXPIRE" | default "604800" }}
+# JWT 签发者
+jwtIssuer: '{{ env "FLYIAM_JWT_ISSUER" | default "flyiam" }}'
+
+# ==================== 管理员配置 ====================
+# 管理员用户名
+adminUsername: '{{ env "FLYIAM_ADMIN_USERNAME" | default "admin" }}'
+# 管理员密码（生产环境必须使用 existingSecret）
+adminPassword: '{{ env "FLYIAM_ADMIN_PASSWORD" | default "ysyh!9Sky" }}'
+# 管理员邮箱
+adminEmail: '{{ env "FLYIAM_ADMIN_EMAIL" | default "admin@example.com" }}'
+
+# ==================== Casdoor 部署配置（内置，随本 Chart 一起部署）====================
+# 是否部署内置 Casdoor（关闭则使用外部 Casdoor）
+casdoorEnabled: {{ env "CASDOOR_ENABLED" | default "true" }}
+# Casdoor 镜像（官方最新镜像）
+casdoorImageRegistry: '{{ env "CASDOOR_IMAGE_REGISTRY" | default "docker.io" }}'
+casdoorImageRepository: '{{ env "CASDOOR_IMAGE_REPOSITORY" | default "casbin/casdoor" }}'
+casdoorImageTag: '{{ env "CASDOOR_IMAGE_TAG" | default "latest" }}'
+# 副本数（Casdoor 有状态，建议单副本）
+casdoorReplicas: {{ env "CASDOOR_REPLICAS" | default "1" }}
+# Service 与端口
+casdoorServiceName: '{{ env "CASDOOR_SERVICE_NAME" | default "casdoor" }}'
+casdoorServicePort: {{ env "CASDOOR_SERVICE_PORT" | default "8000" }}
+# 时区（上海）
+casdoorTimezone: '{{ env "CASDOOR_TIMEZONE" | default "Asia/Shanghai" }}'
+# 静态资源 CDN
+casdoorStaticBaseUrl: '{{ env "CASDOOR_STATIC_BASE_URL" | default "https://cdn.casbin.org" }}'
+# 运行模式 prod/dev
+casdoorRunMode: '{{ env "CASDOOR_RUN_MODE" | default "prod" }}'
+# Casdoor 资源限制
+casdoorResourcesRequestsCpu: '{{ env "CASDOOR_RES_REQ_CPU" | default "100m" }}'
+casdoorResourcesRequestsMemory: '{{ env "CASDOOR_RES_REQ_MEM" | default "256Mi" }}'
+casdoorResourcesLimitsCpu: '{{ env "CASDOOR_RES_LIM_CPU" | default "1" }}'
+casdoorResourcesLimitsMemory: '{{ env "CASDOOR_RES_LIM_MEM" | default "1Gi" }}'
+
+# ==================== Casdoor 应用对接配置（FlyIAM → Casdoor）====================
+# Casdoor 服务地址（Pod 内访问；内置部署时默认指向 Chart 内 casdoor Service）
+casdoorEndpoint: '{{ env "FLYIAM_CASDOOR_ENDPOINT" | default "http://casdoor:8000" }}'
+# Casdoor 公开地址（浏览器访问；跨域名部署时必填，留空则用访问域名）
+casdoorPublicEndpoint: '{{ env "FLYIAM_CASDOOR_PUBLIC_ENDPOINT" | default "" }}'
+# 应用凭据：留空则由程序自动创建并持久化（推荐）
+casdoorClientId: '{{ env "FLYIAM_CASDOOR_CLIENT_ID" | default "" }}'
+casdoorClientSecret: '{{ env "FLYIAM_CASDOOR_CLIENT_SECRET" | default "" }}'
+# 应用证书名（Casdoor 内置证书）
+casdoorCertificate: '{{ env "FLYIAM_CASDOOR_CERTIFICATE" | default "cert-built-in" }}'
+# 组织名称与显示名
+casdoorOrganizationName: '{{ env "FLYIAM_CASDOOR_ORGANIZATION" | default "flyiam" }}'
+casdoorOrganizationDisplayName: '{{ env "FLYIAM_CASDOOR_ORGANIZATION_DISPLAY_NAME" | default "FlyIAM" }}'
+# 应用名称与显示名
+casdoorApplicationName: '{{ env "FLYIAM_CASDOOR_APPLICATION" | default "flyiam" }}'
+casdoorApplicationDisplayName: '{{ env "FLYIAM_CASDOOR_APPLICATION_DISPLAY_NAME" | default "FlyIAM" }}'
+# 新用户默认密码
+casdoorDefaultPassword: '{{ env "FLYIAM_CASDOOR_DEFAULT_PASSWORD" | default "ysyh!9Sky" }}'
+# 手机号区域
+casdoorCountryCode: '{{ env "FLYIAM_CASDOOR_COUNTRY_CODE" | default "CN" }}'
+# 启动时自动初始化 Casdoor（组织/应用/管理员）
+casdoorAutoSetup: {{ env "FLYIAM_CASDOOR_AUTO_SETUP" | default "true" }}
+# 登录回调地址不存在时自动追加
+casdoorAutoRedirectUri: {{ env "FLYIAM_CASDOOR_AUTO_REDIRECT_URI" | default "true" }}
+
+# ==================== 数据源配置（插件式架构）====================
+# HTTP API 数据源配置
+datasourceHttpApiEnabled: {{ env "FLYIAM_DATASOURCE_HTTPAPI_ENABLED" | default "false" }}
+datasourceHttpApiUrl: '{{ env "FLYIAM_DATASOURCE_HTTPAPI_URL" | default "" }}'
+datasourceHttpApiTimeout: {{ env "FLYIAM_DATASOURCE_HTTPAPI_TIMEOUT" | default "30" }}
+datasourceHttpApiSyncInterval: '{{ env "FLYIAM_DATASOURCE_HTTPAPI_SYNC_INTERVAL" | default "6h" }}'
+datasourceHttpApiAutoSync: {{ env "FLYIAM_DATASOURCE_HTTPAPI_AUTO_SYNC" | default "true" }}
+datasourceHttpApiPriority: {{ env "FLYIAM_DATASOURCE_HTTPAPI_PRIORITY" | default "90" }}
+datasourceHttpApiAuthType: '{{ env "FLYIAM_DATASOURCE_HTTPAPI_AUTH_TYPE" | default "bearer" }}'
+datasourceHttpApiAuthToken: '{{ env "FLYIAM_DATASOURCE_HTTPAPI_AUTH_TOKEN" | default "" }}'
+
+# ==================== Casdoor 同步配置 ====================
+# 是否启用自动同步到 Casdoor
+casdoorSyncEnabled: {{ env "FLYIAM_CASDOOR_SYNC_ENABLED" | default "true" }}
+# 数据源同步后自动触发
+casdoorSyncAuto: {{ env "FLYIAM_CASDOOR_SYNC_AUTO" | default "true" }}
+# 批量同步大小
+casdoorSyncBatchSize: {{ env "FLYIAM_CASDOOR_SYNC_BATCH_SIZE" | default "50" }}
+# 失败重试次数
+casdoorSyncRetryTimes: {{ env "FLYIAM_CASDOOR_SYNC_RETRY_TIMES" | default "3" }}
+# 重试间隔（秒）
+casdoorSyncRetryInterval: {{ env "FLYIAM_CASDOOR_SYNC_RETRY_INTERVAL" | default "5" }}
+
+# ==================== 审计日志配置 ====================
+# 是否启用审计日志
+auditEnabled: {{ env "FLYIAM_AUDIT_ENABLED" | default "true" }}
+# 日志保留天数
+auditRetentionDays: {{ env "FLYIAM_AUDIT_RETENTION_DAYS" | default "90" }}
+
+# ==================== 日志配置 ====================
+# 日志级别（debug / info / warn / error）
+logLevel: '{{ env "FLYIAM_LOG_LEVEL" | default "info" }}'
+# 日志格式（json / text）
+logFormat: '{{ env "FLYIAM_LOG_FORMAT" | default "json" }}'
+
+# ==================== 节点调度配置 ====================
+# 节点标签（用于节点亲和性）
+nodeLabel: '{{ env "FLYIAM_NODE_LABEL" | default "flyiam" }}'
+nodeLabelValue: '{{ env "FLYIAM_NODE_LABEL_VALUE" | default "true" }}'
+
+# ==================== 资源限制配置 ====================
+# FlyIAM 资源配置
+resourcesRequestsCpu: '{{ env "FLYIAM_RES_REQ_CPU" | default "100m" }}'
+resourcesRequestsMemory: '{{ env "FLYIAM_RES_REQ_MEM" | default "256Mi" }}'
+resourcesLimitsCpu: '{{ env "FLYIAM_RES_LIM_CPU" | default "2" }}'
+resourcesLimitsMemory: '{{ env "FLYIAM_RES_LIM_MEM" | default "1Gi" }}'
+
+# ==================== HPA 自动扩缩容配置 ====================
+# 是否启用 HPA
+hpaEnabled: {{ env "FLYIAM_HPA_ENABLED" | default "false" }}
+# 最小副本数
+hpaMinReplicas: {{ env "FLYIAM_HPA_MIN_REPLICAS" | default "2" }}
+# 最大副本数
+hpaMaxReplicas: {{ env "FLYIAM_HPA_MAX_REPLICAS" | default "10" }}
+# CPU 目标使用率
+hpaTargetCpuUtilization: {{ env "FLYIAM_HPA_TARGET_CPU" | default "80" }}
+# 内存目标使用率
+hpaTargetMemoryUtilization: {{ env "FLYIAM_HPA_TARGET_MEMORY" | default "80" }}
+
+# ==================== 引用已存在的 Secret ====================
+# 如果设置，将从该 Secret 读取敏感信息，优先级高于上面的明文配置
+# Secret 必须包含以下 key:
+#   - DB_PASSWORD          # 数据库密码
+#   - REDIS_PASSWORD       # Redis 密码
+#   - JWT_SECRET           # JWT 密钥
+#   - ADMIN_PASSWORD       # 管理员密码
+#   - CASDOOR_CLIENT_ID    # Casdoor Client ID
+#   - CASDOOR_CLIENT_SECRET  # Casdoor Client Secret
+existingSecret: '{{ env "FLYIAM_EXISTING_SECRET" | default "" }}'

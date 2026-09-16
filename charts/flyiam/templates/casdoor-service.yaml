@@ -1,0 +1,22 @@
+{{- if .Values.casdoor.enabled }}
+# =============================================================================
+# Casdoor Service
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.casdoor.service.name }}
+  labels:
+    {{- include "flyiam.labels" . | nindent 4 }}
+    app.kubernetes.io/component: casdoor
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.casdoor.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "flyiam.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: casdoor
+{{- end }}

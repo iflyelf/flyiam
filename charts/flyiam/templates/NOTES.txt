@@ -1,0 +1,75 @@
+╔════════════════════════════════════════════════════════════════╗
+║                                                                ║
+║     🎉 FlyIAM 已成功部署到 Kubernetes 集群！🎉                 ║
+║                                                                ║
+║     统一用户管理系统（内置 Casdoor 认证中心）                   ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+部署信息
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Release:      {{ .Release.Name }}
+  Namespace:    {{ .Release.Namespace }}
+  Chart:        {{ .Chart.Name }}-{{ .Chart.Version }}
+  App Version:  {{ .Chart.AppVersion }}
+  内置 Casdoor:  {{ .Values.casdoor.enabled }}
+
+1. 查看部署状态
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  查看 Pod：
+    kubectl get pods -n {{ .Release.Namespace }}
+
+  查看日志（FlyIAM，含自动初始化过程）：
+    kubectl logs -f deploy/{{ include "flyiam.fullname" . }} -n {{ .Release.Namespace }}
+
+  {{- if .Values.casdoor.enabled }}
+  查看日志（Casdoor）：
+    kubectl logs -f deploy/{{ include "flyiam.fullname" . }}-casdoor -n {{ .Release.Namespace }}
+  {{- end }}
+
+2. 自动初始化说明（首次启动）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✅ 数据库表由程序自动创建（无需手工执行 SQL）
+  {{- if .Values.casdoor.enabled }}
+  ✅ Casdoor 自动创建组织 / 应用 / 管理员
+  {{- end }}
+  {{- if .Values.casdoor.autoSetup }}
+  ✅ FlyIAM 自动完成 Casdoor 初始化并回填应用凭据
+  {{- end }}
+  ✅ 登录回调地址按访问域名自动追加白名单
+
+3. 访问
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  FlyIAM 控制台：
+    kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "flyiam.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+    浏览器访问 http://localhost:{{ .Values.service.port }}
+
+  {{- if .Values.casdoor.enabled }}
+  Casdoor 管理后台：
+    kubectl port-forward -n {{ .Release.Namespace }} svc/{{ .Values.casdoor.service.name }} {{ .Values.casdoor.service.port }}:{{ .Values.casdoor.service.port }}
+    浏览器访问 http://localhost:{{ .Values.casdoor.service.port }}
+  {{- end }}
+
+4. 默认凭据
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  管理员：{{ .Values.adminUsername }}
+  默认用户密码：{{ .Values.casdoorDefaultPassword }}
+
+  ⚠️ 生产环境请务必修改默认密码。
+
+5. 配置更新
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  helm upgrade {{ .Release.Name }} . -n {{ .Release.Namespace }} --reuse-values --set image.tag=new-version
+
+6. 更多文档
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  📖 https://github.com/iflyelf/flyiam
+     - 部署：docs/deployment/kubernetes.md
+     - Casdoor：docs/deployment/casdoor.md
+     - 架构：docs/design/architecture.md

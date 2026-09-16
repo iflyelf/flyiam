@@ -1,0 +1,78 @@
+#=================================================
+# https://github.com/iflyelf/flyiam
+# License: MIT
+# Author: iflyelf
+#=================================================
+
+name: Helm Chart 校验
+
+# 校验 Helm Chart 语法与渲染结果
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'charts/**'
+      - '.github/workflows/helm-lint.yml'
+  pull_request:
+    paths:
+      - 'charts/**'
+  workflow_dispatch:
+    inputs:
+      build:
+        description: 'lint flyiam chart'
+        required: true
+        default: 'lint flyiam chart'
+  watch:
+    types: [started]
+
+jobs:
+  lint:
+    name: Chart 语法校验
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.16.2'
+
+      - name: 安装 Helmfile
+        run: |
+          curl -fsSL -o /tmp/helmfile.tar.gz \
+            https://github.com/helmfile/helmfile/releases/download/v0.171.0/helmfile_0.171.0_linux_amd64.tar.gz
+          tar -xzf /tmp/helmfile.tar.gz -C /tmp helmfile
+          sudo mv /tmp/helmfile /usr/local/bin/helmfile
+          helmfile --version
+
+      - name: Lint Chart（含内置 Casdoor 校验）
+        working-directory: charts/flyiam
+        run: helmfile -e default lint
+
+      - name: 渲染 Chart（各环境）
+        working-directory: charts/flyiam
+        run: |
+          for env in default dev staging prod; do
+            echo "=== 渲染环境: ${env} ==="
+            helmfile -e "${env}" template > "/tmp/render-${env}.yaml"
+            echo "  ✅ ${env}: $(wc -l < "/tmp/render-${env}.yaml") 行"
+          done
+
+      - name: 校验生成的 YAML 语法
+        run: |
+          python3 - <<'PY'
+          import glob, sys, yaml
+          ok = True
+          for path in sorted(glob.glob('/tmp/render-*.yaml')):
+              try:
+                  docs = [d for d in yaml.safe_load_all(open(path, encoding='utf-8')) if d]
+                  kinds = ', '.join(sorted({d.get('kind', '?') for d in docs}))
+                  print(f"✅ {path}: {len(docs)} 个资源（{kinds}）")
+              except yaml.YAMLError as e:
+                  print(f"❌ {path}: YAML 语法错误 -> {e}")
+                  ok = False
+          sys.exit(0 if ok else 1)
+          PY

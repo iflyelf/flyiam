@@ -1,0 +1,412 @@
+package handler
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+	"strings"
+
+	casdoorsdk "github.com/casdoor/casdoor-go-sdk/casdoorsdk"
+	"github.com/iflyelf/flyiam/internal/model"
+	"github.com/iflyelf/flyiam/internal/svc"
+	"github.com/zeromicro/go-zero/rest/pathvar"
+)
+
+// userPayload 用户新增/更新入参
+type userPayload struct {
+	DomainAccount   string `json:"domainAccount"`
+	EmployeeCode    string `json:"employeeCode"`
+	Name            string `json:"name"`
+	Phone           string `json:"phone"`
+	WorkEmail       string `json:"workEmail"`
+	CompileType     string `json:"compileType"`
+	SuperiorAccount string `json:"superiorAccount"`
+	DeptNameLv0     string `json:"deptNameLv0"`
+	DeptNameLv1     string `json:"deptNameLv1"`
+	DeptNameLv2     string `json:"deptNameLv2"`
+	Password        string `json:"password"`
+}
+
+// ListUsersHandler 用户列表（数据来源：Casdoor，服务端分页，避免全量拉取导致卡顿）
+func ListUsersHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svcCtx.CasdoorClient == nil {
+			fail(w, http.StatusServiceUnavailable, "Casdoor 未初始化")
+			return
+		}
+		page := atoiDefault(r.URL.Query().Get("page"), 1)
+		if page < 1 {
+			page = 1
+		}
+		pageSize := atoiDefault(r.URL.Query().Get("pageSize"), 20)
+		if pageSize < 1 || pageSize > 200 {
+			pageSize = 20
+		}
+		field := normalizeField(r.URL.Query().Get("field"))
+		keyword := strings.TrimSpace(r.URL.Query().Get("keyword"))
+
+		users, total, err := svcCtx.CasdoorClient.GetUsersPage(page, pageSize, field, keyword)
+		if err != nil {
+			fail(w, http.StatusBadGateway, "查询 Casdoor 用户失败: "+err.Error())
+			return
+		}
+		views := make([]model.UserView, 0, len(users))
+		for _, u := range users {
+			views = append(views, casdoorToView(svcCtx, u))
+		}
+		okPage(w, views, int64(total), page, pageSize)
+	}
+}
+
+// friendlyCasdoorErr 将 Casdoor 返回的英文错误转换为友好中文提示
+func friendlyCasdoorErr(msg string) string {
+	switch {
+	case strings.Contains(msg, "Phone already exists"):
+		return "手机号已被其他用户占用"
+	case strings.Contains(msg, "Email already exists"):
+		return "邮箱已被其他用户占用"
+	case strings.Contains(msg, "Username already exists"):
+		return "域账号已存在"
+	case strings.Contains(msg, "Phone number is invalid"):
+		return "手机号格式无效"
+	case strings.Contains(msg, "Email is invalid"):
+		return "邮箱格式无效"
+	default:
+		return msg
+	}
+}
+
+// normalizeField 规范化搜索字段
+//
+// 说明：Casdoor 会对 field 执行 CamelToSnakeCase 后再拼到 SQL，
+// 因此这里传入驼峰命名字段（如 displayName → display_name）。
+func normalizeField(field string) string {
+	switch field {
+	case "name", "displayName", "email", "phone":
+		return field
+	default:
+		return "name"
+	}
+}
+
+// GetUserDetailHandler 用户详情（数据来源：Casdoor）
+func GetUserDetailHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svcCtx.CasdoorClient == nil {
+			fail(w, http.StatusServiceUnavailable, "Casdoor 未初始化")
+			return
+		}
+		account := strings.TrimSpace(r.URL.Query().Get("domainAccount"))
+		if account == "" {
+			fail(w, http.StatusBadRequest, "domainAccount 不能为空")
+			return
+		}
+		u, err := svcCtx.CasdoorClient.GetUser(account)
+		if err != nil || u == nil {
+			fail(w, http.StatusNotFound, "用户不存在")
+			return
+		}
+		ok(w, casdoorToView(svcCtx, u))
+	}
+}
+
+// GetUserStatsHandler 用户统计（数据来源：Casdoor）
+func GetUserStatsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svcCtx.CasdoorClient == nil {
+			ok(w, map[string]interface{}{"total": 0, "protected": []string{}})
+			return
+		}
+		total, err := svcCtx.CasdoorClient.GetUserCount()
+		if err != nil {
+			fail(w, http.StatusBadGateway, "查询 Casdoor 用户数失败: "+err.Error())
+			return
+		}
+		ok(w, map[string]interface{}{
+			"total":     total,
+			"protected": svcCtx.CasdoorClient.ProtectedUsers(),
+		})
+	}
+}
+
+// CreateUserHandler 新增用户（写入 Casdoor）
+func CreateUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svcCtx.CasdoorClient == nil {
+			fail(w, http.StatusServiceUnavailable, "Casdoor 未初始化")
+			return
+		}
+		var p userPayload
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			fail(w, http.StatusBadRequest, "参数解析失败: "+err.Error())
+			return
+		}
+		p.DomainAccount = strings.TrimSpace(p.DomainAccount)
+		if p.DomainAccount == "" || p.Name == "" {
+			fail(w, http.StatusBadRequest, "域账号与姓名不能为空")
+			return
+		}
+
+		user := buildNewUser(svcCtx, &p)
+		if okAdd, err := svcCtx.CasdoorClient.AddUser(user); err != nil {
+			fail(w, http.StatusBadGateway, "新增用户失败: "+friendlyCasdoorErr(err.Error()))
+			return
+		} else if !okAdd {
+			fail(w, http.StatusBadGateway, "新增用户失败")
+			return
+		}
+		svcCtx.CasdoorClient.InvalidateUsersCache()
+		ok(w, casdoorToView(svcCtx, user))
+	}
+}
+
+// UpdateUserHandler 更新用户（写入 Casdoor）
+func UpdateUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svcCtx.CasdoorClient == nil {
+			fail(w, http.StatusServiceUnavailable, "Casdoor 未初始化")
+			return
+		}
+		name := pathvar.Vars(r)["name"]
+		if name == "" {
+			fail(w, http.StatusBadRequest, "缺少用户标识")
+			return
+		}
+		var p userPayload
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			fail(w, http.StatusBadRequest, "参数解析失败: "+err.Error())
+			return
+		}
+
+		existing, err := svcCtx.CasdoorClient.GetUser(name)
+		if err != nil || existing == nil {
+			fail(w, http.StatusNotFound, "用户不存在")
+			return
+		}
+		applyUserPayload(svcCtx, existing, &p)
+		if _, err := svcCtx.CasdoorClient.UpdateUser(existing); err != nil {
+			fail(w, http.StatusBadGateway, "更新用户失败: "+friendlyCasdoorErr(err.Error()))
+			return
+		}
+		svcCtx.CasdoorClient.InvalidateUsersCache()
+		ok(w, casdoorToView(svcCtx, existing))
+	}
+}
+
+// DeleteUserHandler 删除用户（写入 Casdoor，受保护用户不可删除）
+func DeleteUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svcCtx.CasdoorClient == nil {
+			fail(w, http.StatusServiceUnavailable, "Casdoor 未初始化")
+			return
+		}
+		name := pathvar.Vars(r)["name"]
+		if name == "" {
+			fail(w, http.StatusBadRequest, "缺少用户标识")
+			return
+		}
+		if svcCtx.CasdoorClient.IsProtected(name) {
+			fail(w, http.StatusForbidden, "该用户为受保护用户，禁止删除")
+			return
+		}
+		if _, err := svcCtx.CasdoorClient.DeleteUser(name); err != nil {
+			fail(w, http.StatusBadGateway, "删除用户失败: "+err.Error())
+			return
+		}
+		svcCtx.CasdoorClient.InvalidateUsersCache()
+		ok(w, nil)
+	}
+}
+
+// BatchDeleteUsersHandler 批量删除用户（跳过受保护用户）
+func BatchDeleteUsersHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svcCtx.CasdoorClient == nil {
+			fail(w, http.StatusServiceUnavailable, "Casdoor 未初始化")
+			return
+		}
+		var req struct {
+			Names []string `json:"names"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			fail(w, http.StatusBadRequest, "参数解析失败: "+err.Error())
+			return
+		}
+		if len(req.Names) == 0 {
+			fail(w, http.StatusBadRequest, "请选择要删除的用户")
+			return
+		}
+		deleted, skipped, failed := svcCtx.CasdoorClient.BatchDeleteUsers(r.Context(), req.Names)
+		ok(w, map[string]interface{}{
+			"deleted": deleted,
+			"skipped": skipped,
+			"failed":  failed,
+		})
+	}
+}
+
+// casdoorToView Casdoor 用户转统一视图（人事字段取自属性）
+func casdoorToView(svcCtx *svc.ServiceContext, u *casdoorsdk.User) model.UserView {
+	props := u.Properties
+	if props == nil {
+		props = map[string]string{}
+	}
+	status := "active"
+	if u.IsForbidden {
+		status = "forbidden"
+	}
+	view := model.UserView{
+		Source:          "casdoor",
+		DomainAccount:   u.Name,
+		EmployeeCode:    props["empCode"],
+		Name:            u.DisplayName,
+		Avatar:          u.Avatar,
+		Phone:           u.Phone,
+		WorkEmail:       u.Email,
+		CompileType:     props["compileType"],
+		SuperiorAccount: props["superior"],
+		DeptNameLv0:     props["deptNameLv0"],
+		DeptNameLv1:     props["deptNameLv1"],
+		DeptNameLv2:     props["deptNameLv2"],
+		Status:          status,
+		CasdoorSynced:   true,
+	}
+	if svcCtx.CasdoorClient != nil {
+		view.IsProtected = svcCtx.CasdoorClient.IsProtected(u.Name)
+	}
+	return view
+}
+
+// buildNewUser 构建新用户
+func buildNewUser(svcCtx *svc.ServiceContext, p *userPayload) *casdoorsdk.User {
+	password := p.Password
+	if password == "" {
+		password = svcCtx.Config.Casdoor.DefaultPassword
+	}
+	return &casdoorsdk.User{
+		Owner:             svcCtx.Config.Casdoor.OrganizationName,
+		Name:              p.DomainAccount,
+		DisplayName:       p.Name,
+		Email:             p.WorkEmail,
+		Phone:             p.Phone,
+		CountryCode:       svcCtx.Config.Casdoor.CountryCode,
+		Password:          password,
+		Type:              "normal-user",
+		Language:          "zh",
+		Tag:               "manual",
+		Address:           []string{},
+		Properties:        payloadProps(p),
+		SignupApplication: svcCtx.Config.Casdoor.ApplicationName,
+	}
+}
+
+// applyUserPayload 将入参应用到现有用户
+func applyUserPayload(svcCtx *svc.ServiceContext, u *casdoorsdk.User, p *userPayload) {
+	u.DisplayName = p.Name
+	u.Email = p.WorkEmail
+	u.Phone = p.Phone
+	u.CountryCode = svcCtx.Config.Casdoor.CountryCode
+	u.Tag = "manual"
+	if u.Properties == nil {
+		u.Properties = map[string]string{}
+	}
+	for k, v := range payloadProps(p) {
+		u.Properties[k] = v
+	}
+}
+
+// payloadProps 提取人事属性
+func payloadProps(p *userPayload) map[string]string {
+	return map[string]string{
+		"empCode":     p.EmployeeCode,
+		"compileType": p.CompileType,
+		"deptNameLv0": p.DeptNameLv0,
+		"deptNameLv1": p.DeptNameLv1,
+		"deptNameLv2": p.DeptNameLv2,
+		"superior":    p.SuperiorAccount,
+		"source":      "manual",
+	}
+}
+
+// atoiDefault 字符串转 int，失败返回默认值
+func atoiDefault(s string, def int) int {
+	if s == "" {
+		return def
+	}
+	if v, err := strconv.Atoi(s); err == nil {
+		return v
+	}
+	return def
+}
+
+// atoiInt64 字符串转 int64
+func atoiInt64(s string) (int64, error) {
+	return strconv.ParseInt(s, 10, 64)
+}
+
+// ResetPasswordHandler 管理员重置用户密码为系统默认密码
+func ResetPasswordHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svcCtx.CasdoorClient == nil {
+			fail(w, http.StatusServiceUnavailable, "Casdoor 未初始化")
+			return
+		}
+		name := pathvar.Vars(r)["name"]
+		if name == "" {
+			fail(w, http.StatusBadRequest, "缺少用户标识")
+			return
+		}
+		var req struct {
+			Password string `json:"password"`
+		}
+		// 允许自定义密码，留空则使用默认密码
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		newPassword := req.Password
+		if newPassword == "" {
+			newPassword = svcCtx.CasdoorClient.DefaultPassword()
+		}
+		okPwd, err := svcCtx.CasdoorClient.SetUserPassword(name, "", newPassword)
+		if err != nil {
+			// 新旧密码相同时 Casdoor 会报错，视为重置成功（幂等）
+			if strings.Contains(err.Error(), "must be different") {
+				ok(w, map[string]string{"password": newPassword, "message": "密码未变更（与原密码相同）"})
+				return
+			}
+			fail(w, http.StatusBadGateway, "重置密码失败: "+friendlyCasdoorErr(err.Error()))
+			return
+		}
+		if !okPwd {
+			fail(w, http.StatusBadGateway, "重置密码失败")
+			return
+		}
+		ok(w, map[string]string{"password": newPassword})
+	}
+}
+
+// SetUserAdminHandler 设置用户管理员标记
+func SetUserAdminHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svcCtx.CasdoorClient == nil {
+			fail(w, http.StatusServiceUnavailable, "Casdoor 未初始化")
+			return
+		}
+		name := pathvar.Vars(r)["name"]
+		var req struct {
+			IsAdmin bool `json:"isAdmin"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			fail(w, http.StatusBadRequest, "参数解析失败")
+			return
+		}
+		if svcCtx.CasdoorClient.IsProtected(name) && !req.IsAdmin {
+			fail(w, http.StatusForbidden, "该用户为受保护用户，禁止取消管理员")
+			return
+		}
+		if err := svcCtx.CasdoorClient.SetUserAdmin(name, req.IsAdmin); err != nil {
+			fail(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		svcCtx.CasdoorClient.InvalidateUsersCache()
+		ok(w, nil)
+	}
+}

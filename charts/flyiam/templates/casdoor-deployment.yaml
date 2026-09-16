@@ -1,0 +1,104 @@
+{{- if .Values.casdoor.enabled }}
+# =============================================================================
+# Casdoor Deployment
+#
+# 说明：
+#   - 使用官方最新镜像 casbin/casdoor:latest
+#   - 时区 Asia/Shanghai，语言中文
+#   - initContainer 将 ConfigMap 模板中的 __DB_PASSWORD__ 替换为真实密码
+#   - 数据库表由 Casdoor 首次启动自动创建（无需手工执行 SQL）
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "flyiam.fullname" . }}-casdoor
+  labels:
+    {{- include "flyiam.labels" . | nindent 4 }}
+    app.kubernetes.io/component: casdoor
+spec:
+  replicas: {{ .Values.casdoor.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "flyiam.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: casdoor
+  template:
+    metadata:
+      labels:
+        {{- include "flyiam.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: casdoor
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/casdoor-configmap.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # 生成 app.conf（替换数据库密码占位符）
+      initContainers:
+        - name: prepare-config
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              sed "s|__DB_PASSWORD__|${DB_PASSWORD}|g" /config-template/app.conf.tpl > /conf/app.conf
+              echo "✅ Casdoor app.conf 已生成"
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.existingSecret }}
+                  name: {{ .Values.existingSecret }}
+                  {{- else }}
+                  name: {{ include "flyiam.fullname" . }}-secret
+                  {{- end }}
+                  key: DB_PASSWORD
+          volumeMounts:
+            - name: casdoor-config-template
+              mountPath: /config-template
+            - name: casdoor-conf
+              mountPath: /conf
+      containers:
+        - name: casdoor
+          image: "{{ .Values.casdoor.image.registry }}/{{ .Values.casdoor.image.repository }}:{{ .Values.casdoor.image.tag }}"
+          imagePullPolicy: {{ .Values.casdoor.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.casdoor.service.port }}
+              protocol: TCP
+          env:
+            # 时区：上海
+            - name: TZ
+              value: {{ .Values.casdoor.timezone | quote }}
+            # 运行于容器内
+            - name: RUNNING_IN_DOCKER
+              value: "true"
+          volumeMounts:
+            - name: casdoor-conf
+              mountPath: /conf
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.casdoor.resources | nindent 12 }}
+      volumes:
+        - name: casdoor-config-template
+          configMap:
+            name: {{ include "flyiam.fullname" . }}-casdoor-config
+        - name: casdoor-conf
+          emptyDir: {}
+{{- end }}

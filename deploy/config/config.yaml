@@ -1,0 +1,192 @@
+# =============================================================================
+# FlyIAM 统一用户管理系统 - 配置文件
+#
+# 说明：
+#   1. 所有配置项均支持环境变量覆盖（优先级：环境变量 > 配置文件）
+#   2. 环境变量命名规则：大写 + 下划线（如 SERVER_PORT）
+#   3. 敏感信息（密码、密钥）建议通过环境变量或 Kubernetes Secret 注入
+#   4. 本配置文件为示例配置，已完全脱敏，可公开
+#   5. 生产环境部署前务必修改所有默认密码
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 服务基础配置
+# -----------------------------------------------------------------------------
+Name: flyiam                          # 服务名称
+Host: 0.0.0.0                         # 监听地址（环境变量: SERVER_HOST）
+Port: 8081                            # 监听端口（环境变量: SERVER_PORT）
+Mode: dev                             # 运行模式: dev/test/release（环境变量: SERVER_MODE）
+Timeout: 30000                        # 服务端超时时间，单位毫秒（环境变量: SERVER_TIMEOUT）
+
+# -----------------------------------------------------------------------------
+# 数据库配置（PostgreSQL - 外置）
+# -----------------------------------------------------------------------------
+Database:
+  # 完整 DSN 连接串（优先级最高，设置后下方分项配置失效）
+  # 格式: postgresql://用户:密码@地址:端口/数据库?sslmode=disable
+  # 环境变量: DATABASE_URL
+  DSN: ""
+  
+  # 分项配置（DSN 为空时使用以下配置拼装）
+  Host: localhost                     # 数据库地址（环境变量: DB_HOST）
+  Port: 5432                          # 数据库端口（环境变量: DB_PORT）
+  User: postgres                      # 数据库用户（环境变量: DB_USER）
+  Password: ""                        # 数据库密码（环境变量: DB_PASSWORD）⚠️ 建议环境变量
+  DBName: flyiam                      # 数据库名称（环境变量: DB_NAME）
+  SSLMode: disable                    # SSL 模式（环境变量: DB_SSLMODE）
+  
+  # 连接池配置
+  MaxOpenConns: 100                   # 最大打开连接数（环境变量: DB_MAX_OPEN_CONNS）
+  MaxIdleConns: 10                    # 最大空闲连接数（环境变量: DB_MAX_IDLE_CONNS）
+  ConnMaxLifetime: 3600               # 连接最大生命周期，单位秒（环境变量: DB_CONN_MAX_LIFETIME）
+
+# -----------------------------------------------------------------------------
+# JWT 配置（Token 签发与验证）
+# -----------------------------------------------------------------------------
+JWT:
+  Secret: ""                          # JWT 密钥（环境变量: JWT_SECRET）⚠️ 必填，建议32位以上
+  AccessExpire: 7200                  # Access Token 过期时间，单位秒（2小时）（环境变量: JWT_ACCESS_EXPIRE）
+  RefreshExpire: 604800               # Refresh Token 过期时间，单位秒（7天）（环境变量: JWT_REFRESH_EXPIRE）
+  Issuer: flyiam                      # JWT 签发者（环境变量: JWT_ISSUER）
+
+# -----------------------------------------------------------------------------
+# 管理员配置（初始管理员账号）
+# -----------------------------------------------------------------------------
+Admin:
+  Username: admin                     # 管理员用户名（环境变量: ADMIN_USERNAME）
+  Password: ""                        # 管理员密码（环境变量: ADMIN_PASSWORD）⚠️ 必填
+  Email: admin@example.com            # 管理员邮箱（环境变量: ADMIN_EMAIL）
+
+# -----------------------------------------------------------------------------
+# Casdoor 认证配置（OAuth2 SSO - 外置）
+# -----------------------------------------------------------------------------
+Casdoor:
+  # 后端访问 Casdoor 的地址（容器内网地址，如 http://casdoor:8000）
+  Endpoint: ""                        # （环境变量: CASDOOR_ENDPOINT）
+  
+  # 浏览器访问 Casdoor 的地址（跨域名部署时必填，留空则用访问域名）
+  PublicEndpoint: ""                  # （环境变量: CASDOOR_PUBLIC_ENDPOINT）
+  
+  # 应用凭据：留空则由程序自动在 Casdoor 中创建并持久化（推荐）
+  ClientId: ""                        # （环境变量: CASDOOR_CLIENT_ID）
+  ClientSecret: ""                    # （环境变量: CASDOOR_CLIENT_SECRET）
+  # 应用证书名（Casdoor 内置证书）
+  Certificate: "cert-built-in"        # （环境变量: CASDOOR_CERTIFICATE）
+  
+  # 组织（名称 + 显示名）
+  OrganizationName: flyiam            # （环境变量: CASDOOR_ORGANIZATION）
+  OrganizationDisplayName: FlyIAM     # （环境变量: CASDOOR_ORGANIZATION_DISPLAY_NAME）
+  # 应用（名称 + 显示名）
+  ApplicationName: flyiam             # （环境变量: CASDOOR_APPLICATION）
+  ApplicationDisplayName: FlyIAM      # （环境变量: CASDOOR_APPLICATION_DISPLAY_NAME）
+  
+  # 用户初始密码配置（环境变量: CASDOOR_DEFAULT_PASSWORD）
+  DefaultPassword: "ysyh!9Sky"
+  # 用户手机号所属国家/地区代码（ISO 3166-1 alpha-2，环境变量: CASDOOR_COUNTRY_CODE）
+  CountryCode: "CN"
+  # 用户列表内存缓存时长（秒），降低 Casdoor 全量查询压力（环境变量: CASDOOR_USER_CACHE_TTL）
+  UserCacheTTL: 30
+  # 启动时自动初始化 Casdoor（组织/应用/管理员）（环境变量: CASDOOR_AUTO_SETUP）
+  AutoSetup: true
+  # 登录回调地址不存在时自动追加白名单（环境变量: CASDOOR_AUTO_REDIRECT_URI）
+  AutoRedirectURI: true
+  # 应用回调地址白名单（留空则登录时按访问域名自动追加）
+  RedirectURIs: []
+  # 受保护用户（域账号），同步与删除时跳过
+  ProtectedUsers: ["admin", "junwang66"]
+
+# -----------------------------------------------------------------------------
+# Redis 缓存配置（外置，可选）
+# -----------------------------------------------------------------------------
+Redis:
+  Enabled: true                       # 是否启用缓存（环境变量: REDIS_ENABLED）
+  Host: localhost                     # Redis 地址（环境变量: REDIS_HOST）
+  Port: 6379                          # Redis 端口（环境变量: REDIS_PORT）
+  Password: ""                        # Redis 密码（环境变量: REDIS_PASSWORD）⚠️ 建议环境变量
+  DB: 0                               # Redis 数据库编号（环境变量: REDIS_DB）
+  TTL: 300                            # 缓存过期时间，单位秒（环境变量: REDIS_CACHE_TTL）
+
+# -----------------------------------------------------------------------------
+# 前端配置
+# -----------------------------------------------------------------------------
+Web:
+  Embedded: true                      # 是否嵌入前端（环境变量: WEB_EMBEDDED）
+  StaticDir: ./web/dist               # 前端静态文件目录（环境变量: WEB_STATIC_DIR）
+
+# -----------------------------------------------------------------------------
+# 日志配置
+# -----------------------------------------------------------------------------
+LogConfig:
+  Level: info                         # 日志级别: debug/info/warn/error（环境变量: LOG_LEVEL）
+  Format: json                        # 日志格式: json/text（环境变量: LOG_FORMAT）
+
+# -----------------------------------------------------------------------------
+# 审计日志配置
+# -----------------------------------------------------------------------------
+Audit:
+  Enabled: true                       # 是否启用审计日志（环境变量: AUDIT_ENABLED）
+  RetentionDays: 90                   # 审计日志保留天数（环境变量: AUDIT_RETENTION_DAYS）
+
+# -----------------------------------------------------------------------------
+# 权限配置
+# -----------------------------------------------------------------------------
+Permission:
+  EnableRBAC: true                    # 是否启用 RBAC 权限控制（环境变量: PERMISSION_ENABLE_RBAC）
+  DefaultRole: "user"                 # 新用户默认角色（环境变量: PERMISSION_DEFAULT_ROLE）
+  AdminUsers: ["admin"]               # 管理员用户列表（环境变量: PERMISSION_ADMIN_USERS，逗号分隔）
+
+# =============================================================================
+# 数据源配置（插件式架构）
+# 
+# 说明：
+#   - 每个数据源可独立启用/禁用
+#   - 不同数据源按优先级合并用户数据
+#   - 删除某个数据源配置不影响系统运行
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# HTTP API 数据源（示例）
+# -----------------------------------------------------------------------------
+DataSources:
+  HttpApi:
+    # 是否启用该数据源（环境变量: DATASOURCE_HTTPAPI_ENABLED）
+    Enabled: false
+    
+    # API 地址
+    URL: "http://hr-api.example.com/api/users"  # （环境变量: DATASOURCE_HTTPAPI_URL）
+    
+    # API 超时时间，单位秒
+    Timeout: 30                        # （环境变量: DATASOURCE_HTTPAPI_TIMEOUT）
+    
+    # 数据同步配置
+    SyncInterval: "6h"                 # 同步间隔（支持: 1h, 30m, 6h 等）（环境变量: DATASOURCE_HTTPAPI_SYNC_INTERVAL）
+    AutoSyncOnStartup: true            # 启动时是否自动同步（环境变量: DATASOURCE_HTTPAPI_AUTO_SYNC）
+    
+    # 数据优先级（数字越大优先级越高，用于数据去重）
+    Priority: 90                       # （环境变量: DATASOURCE_HTTPAPI_PRIORITY）
+    
+    # API 认证配置
+    Auth:
+      Type: "bearer"                   # 认证类型: bearer, basic, apikey, none
+      Token: ""                        # Bearer Token 或 API Key（环境变量: DATASOURCE_HTTPAPI_AUTH_TOKEN）
+      Username: ""                     # Basic Auth 用户名（环境变量: DATASOURCE_HTTPAPI_AUTH_USERNAME）
+      Password: ""                     # Basic Auth 密码（环境变量: DATASOURCE_HTTPAPI_AUTH_PASSWORD）
+
+# =============================================================================
+# Casdoor 同步配置
+# =============================================================================
+CasdoorSync:
+  # 是否启用自动同步到 Casdoor
+  Enabled: true                        # （环境变量: CASDOOR_SYNC_ENABLED）
+  
+  # 数据源同步完成后，是否自动触发 Casdoor 同步
+  AutoSyncAfterDataSource: true        # （环境变量: CASDOOR_SYNC_AUTO）
+  
+  # 批量同步时的批次大小（避免 Casdoor API 超时）
+  BatchSize: 50                        # （环境变量: CASDOOR_SYNC_BATCH_SIZE）
+  
+  # 同步失败重试次数
+  RetryTimes: 3                        # （环境变量: CASDOOR_SYNC_RETRY_TIMES）
+  
+  # 同步失败重试间隔，单位秒
+  RetryInterval: 5                     # （环境变量: CASDOOR_SYNC_RETRY_INTERVAL）

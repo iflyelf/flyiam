@@ -1,0 +1,337 @@
+# FlyIAM 配置（Helm Chart）
+# 说明：本文件基于 values/_base.yaml.gotmpl 的默认值，通过 Helm 模板渲染为实际配置
+
+# 关闭客户端对敏感键的泄露断言（本项目 secret 从 helmfile 环境变量注入，非明文硬编码）
+assertNoLeakedSecrets: false
+
+# ============================================
+# 基础配置
+# ============================================
+
+# 副本数量（从 helmfile 环境变量注入）
+replicaCount: {{ .Values.replicas }}
+
+# ============================================
+# 镜像配置
+# ============================================
+image:
+  # 镜像仓库地址
+  registry: {{ .Values.imageRegistry | quote }}
+  # 镜像路径
+  repository: {{ .Values.imageRepository | quote }}
+  # 镜像标签
+  tag: {{ .Values.imageTag | quote }}
+  # 拉取策略
+  pullPolicy: {{ .Values.imagePullPolicy | quote }}
+
+# ============================================
+# 服务配置
+# ============================================
+service:
+  type: {{ .Values.serviceType | quote }}
+  port: {{ .Values.servicePort }}
+  # 会话亲和性（多副本场景）
+  sessionAffinity: ClientIP
+
+# ============================================
+# 资源配置
+# ============================================
+resources:
+  requests:
+    cpu: {{ .Values.resourcesRequestsCpu | quote }}
+    memory: {{ .Values.resourcesRequestsMemory | quote }}
+  limits:
+    cpu: {{ .Values.resourcesLimitsCpu | quote }}
+    memory: {{ .Values.resourcesLimitsMemory | quote }}
+
+# ============================================
+# HPA 自动扩缩容配置
+# ============================================
+autoscaling:
+  enabled: {{ .Values.hpaEnabled }}
+  minReplicas: {{ .Values.hpaMinReplicas }}
+  maxReplicas: {{ .Values.hpaMaxReplicas }}
+  targetCPUUtilizationPercentage: {{ .Values.hpaTargetCpuUtilization }}
+  targetMemoryUtilizationPercentage: {{ .Values.hpaTargetMemoryUtilization }}
+
+# ============================================
+# 节点调度配置
+# ============================================
+nodeSelector: {}
+
+# Pod 反亲和性（避免多副本调度到同一节点）
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - flyiam
+          topologyKey: kubernetes.io/hostname
+
+tolerations: []
+
+# ============================================
+# 健康检查配置
+# ============================================
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# ============================================
+# ServiceAccount 配置
+# ============================================
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# ============================================
+# Pod 安全上下文
+# ============================================
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  fsGroupChangePolicy: "OnRootMismatch"
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# ============================================
+# Pod 注解和标签
+# ============================================
+podAnnotations: {}
+
+podLabels:
+  environment: {{ .Values.environment | quote }}
+
+# ============================================
+# 更新策略
+# ============================================
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 0
+    maxSurge: 1
+
+# ============================================
+# 应用配置（通过环境变量注入）
+# ============================================
+env:
+  # 服务配置
+  - name: SERVER_PORT
+    value: {{ .Values.servicePort | quote }}
+  - name: SERVER_MODE
+    value: "release"
+  
+  # 数据库配置
+  - name: DB_HOST
+    value: {{ .Values.dbHost | quote }}
+  - name: DB_PORT
+    value: {{ .Values.dbPort | quote }}
+  - name: DB_NAME
+    value: {{ .Values.dbName | quote }}
+  - name: DB_USER
+    value: {{ .Values.dbUser | quote }}
+  - name: DB_SSLMODE
+    value: {{ .Values.dbSslMode | quote }}
+  - name: DB_MAX_OPEN_CONNS
+    value: {{ .Values.dbMaxOpenConns | quote }}
+  - name: DB_MAX_IDLE_CONNS
+    value: {{ .Values.dbMaxIdleConns | quote }}
+  - name: DB_CONN_MAX_LIFETIME
+    value: {{ .Values.dbConnMaxLifetime | quote }}
+  
+  # Redis 配置
+  - name: REDIS_ENABLED
+    value: {{ .Values.redisEnabled | quote }}
+  - name: REDIS_HOST
+    value: {{ .Values.redisHost | quote }}
+  - name: REDIS_PORT
+    value: {{ .Values.redisPort | quote }}
+  - name: REDIS_DB
+    value: {{ .Values.redisDb | quote }}
+  - name: REDIS_CACHE_TTL
+    value: {{ .Values.redisCacheTtl | quote }}
+  
+  # JWT 配置
+  - name: JWT_ACCESS_EXPIRE
+    value: {{ .Values.jwtAccessExpire | quote }}
+  - name: JWT_REFRESH_EXPIRE
+    value: {{ .Values.jwtRefreshExpire | quote }}
+  - name: JWT_ISSUER
+    value: {{ .Values.jwtIssuer | quote }}
+  
+  # 管理员配置
+  - name: ADMIN_USERNAME
+    value: {{ .Values.adminUsername | quote }}
+  - name: ADMIN_EMAIL
+    value: {{ .Values.adminEmail | quote }}
+  
+  # Casdoor 配置
+  - name: CASDOOR_ENDPOINT
+    value: {{ .Values.casdoorEndpoint | quote }}
+  {{- if .Values.casdoorPublicEndpoint }}
+  - name: CASDOOR_PUBLIC_ENDPOINT
+    value: {{ .Values.casdoorPublicEndpoint | quote }}
+  {{- end }}
+  - name: CASDOOR_ORGANIZATION
+    value: {{ .Values.casdoorOrganizationName | quote }}
+  - name: CASDOOR_ORGANIZATION_DISPLAY_NAME
+    value: {{ .Values.casdoorOrganizationDisplayName | quote }}
+  - name: CASDOOR_APPLICATION
+    value: {{ .Values.casdoorApplicationName | quote }}
+  - name: CASDOOR_APPLICATION_DISPLAY_NAME
+    value: {{ .Values.casdoorApplicationDisplayName | quote }}
+  - name: CASDOOR_CERTIFICATE
+    value: {{ .Values.casdoorCertificate | quote }}
+  - name: CASDOOR_DEFAULT_PASSWORD
+    value: {{ .Values.casdoorDefaultPassword | quote }}
+  - name: CASDOOR_COUNTRY_CODE
+    value: {{ .Values.casdoorCountryCode | quote }}
+  - name: CASDOOR_AUTO_SETUP
+    value: {{ .Values.casdoorAutoSetup | quote }}
+  - name: CASDOOR_AUTO_REDIRECT_URI
+    value: {{ .Values.casdoorAutoRedirectUri | quote }}
+  
+  # Casdoor 同步配置
+  - name: CASDOOR_SYNC_ENABLED
+    value: {{ .Values.casdoorSyncEnabled | quote }}
+  - name: CASDOOR_SYNC_AUTO
+    value: {{ .Values.casdoorSyncAuto | quote }}
+  - name: CASDOOR_SYNC_BATCH_SIZE
+    value: {{ .Values.casdoorSyncBatchSize | quote }}
+  - name: CASDOOR_SYNC_RETRY_TIMES
+    value: {{ .Values.casdoorSyncRetryTimes | quote }}
+  - name: CASDOOR_SYNC_RETRY_INTERVAL
+    value: {{ .Values.casdoorSyncRetryInterval | quote }}
+  
+  # 数据源配置
+  - name: DATASOURCE_HTTPAPI_ENABLED
+    value: {{ .Values.datasourceHttpApiEnabled | quote }}
+  {{- if .Values.datasourceHttpApiUrl }}
+  - name: DATASOURCE_HTTPAPI_URL
+    value: {{ .Values.datasourceHttpApiUrl | quote }}
+  {{- end }}
+  - name: DATASOURCE_HTTPAPI_TIMEOUT
+    value: {{ .Values.datasourceHttpApiTimeout | quote }}
+  - name: DATASOURCE_HTTPAPI_SYNC_INTERVAL
+    value: {{ .Values.datasourceHttpApiSyncInterval | quote }}
+  - name: DATASOURCE_HTTPAPI_AUTO_SYNC
+    value: {{ .Values.datasourceHttpApiAutoSync | quote }}
+  - name: DATASOURCE_HTTPAPI_PRIORITY
+    value: {{ .Values.datasourceHttpApiPriority | quote }}
+  - name: DATASOURCE_HTTPAPI_AUTH_TYPE
+    value: {{ .Values.datasourceHttpApiAuthType | quote }}
+  
+  # 审计日志配置
+  - name: AUDIT_ENABLED
+    value: {{ .Values.auditEnabled | quote }}
+  - name: AUDIT_RETENTION_DAYS
+    value: {{ .Values.auditRetentionDays | quote }}
+  
+  # 日志配置
+  - name: LOG_LEVEL
+    value: {{ .Values.logLevel | quote }}
+  - name: LOG_FORMAT
+    value: {{ .Values.logFormat | quote }}
+
+# ============================================
+# 敏感信息配置（从 Secret 注入）
+# ============================================
+envFrom:
+  {{- if .Values.existingSecret }}
+  - secretRef:
+      name: {{ .Values.existingSecret | quote }}
+  {{- else }}
+  - secretRef:
+      name: flyiam-secret
+  {{- end }}
+
+# ============================================
+# 引用已存在的 Secret
+# ============================================
+existingSecret: {{ .Values.existingSecret | quote }}
+
+# Secret 数据（如果不使用 existingSecret）
+secret:
+  DB_PASSWORD: {{ .Values.dbPassword | quote }}
+  REDIS_PASSWORD: {{ .Values.redisPassword | quote }}
+  JWT_SECRET: {{ .Values.jwtSecret | quote }}
+  ADMIN_PASSWORD: {{ .Values.adminPassword | quote }}
+  CASDOOR_CLIENT_ID: {{ .Values.casdoorClientId | quote }}
+  CASDOOR_CLIENT_SECRET: {{ .Values.casdoorClientSecret | quote }}
+  {{- if .Values.datasourceHttpApiAuthToken }}
+  DATASOURCE_HTTPAPI_AUTH_TOKEN: {{ .Values.datasourceHttpApiAuthToken | quote }}
+  {{- end }}
+
+# ============================================
+# 内置 Casdoor 部署配置（随本 Chart 一起部署）
+# ============================================
+casdoor:
+  # 是否部署内置 Casdoor（false 则使用外部 Casdoor）
+  enabled: {{ .Values.casdoorEnabled }}
+  # 镜像（官方最新镜像 casbin/casdoor:latest）
+  image:
+    registry: {{ .Values.casdoorImageRegistry | quote }}
+    repository: {{ .Values.casdoorImageRepository | quote }}
+    tag: {{ .Values.casdoorImageTag | quote }}
+    pullPolicy: IfNotPresent
+  # 副本数（有状态服务，建议单副本）
+  replicaCount: {{ .Values.casdoorReplicas }}
+  # Service 配置
+  service:
+    name: {{ .Values.casdoorServiceName | quote }}
+    port: {{ .Values.casdoorServicePort }}
+  # 时区与语言（上海时区 / 中文）
+  timezone: {{ .Values.casdoorTimezone | quote }}
+  staticBaseUrl: {{ .Values.casdoorStaticBaseUrl | quote }}
+  runMode: {{ .Values.casdoorRunMode | quote }}
+  # 自动初始化（组织 / 应用 / 管理员）
+  autoSetup: {{ .Values.casdoorAutoSetup }}
+  autoRedirectUri: {{ .Values.casdoorAutoRedirectUri }}
+  # 数据库（与 FlyIAM 共用同一库，表前缀 casdoor_）
+  database:
+    host: {{ .Values.dbHost | quote }}
+    port: {{ .Values.dbPort }}
+    name: {{ .Values.dbName | quote }}
+    user: {{ .Values.dbUser | quote }}
+    sslMode: {{ .Values.dbSslMode | quote }}
+    tablePrefix: "casdoor_"
+  # 资源配置
+  resources:
+    requests:
+      cpu: {{ .Values.casdoorResourcesRequestsCpu | quote }}
+      memory: {{ .Values.casdoorResourcesRequestsMemory | quote }}
+    limits:
+      cpu: {{ .Values.casdoorResourcesLimitsCpu | quote }}
+      memory: {{ .Values.casdoorResourcesLimitsMemory | quote }}
+  # 对外访问地址（浏览器可达，用于 Casdoor origin）
+  origin: {{ .Values.casdoorPublicEndpoint | quote }}
+  # 数据库密码从 Secret 注入（DB_PASSWORD）

@@ -1,0 +1,9 @@
+# Git 属性配置
+* text=auto eol=lf
+*.go text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.sql text eol=lf
+go.sum text eol=lf

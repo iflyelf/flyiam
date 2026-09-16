@@ -1,0 +1,44 @@
+{
+  // ==========================================================================
+  // FlyIAM 项目级编辑器配置（团队共享）
+  //
+  // 目的：本项目的源码目录（internal/、cmd/、web/src/）以及 Go embed 资源
+  // （internal/pkg/web/dist/）必须在资源管理器与全局搜索中可见，
+  // 因此这里显式关闭“遵循 .gitignore 隐藏文件”的行为。
+  // 仅保留 node_modules 等超大目录的隐藏，兼顾性能。
+  // ==========================================================================
+
+  // 不按 .gitignore 隐藏资源管理器文件（父级工作区若开启该选项，此项对本项目生效）
+  "explorer.excludeGitIgnore": false,
+
+  // 全局搜索不遵循 .gitignore/.ignore，确保源码与嵌入资源都能被搜到
+  "search.useIgnoreFilesByDefault": false,
+
+  // 资源管理器仅过滤超大/无意义目录
+  "files.exclude": {
+    "**/.git": true,
+    "**/node_modules": true
+  },
+
+  // 搜索排除超大依赖目录，避免卡顿
+  "search.exclude": {
+    "**/node_modules": true
+  },
+
+  // 文件监听排除，降低 CPU 占用
+  "files.watcherExclude": {
+    "**/.git/**": true,
+    "**/node_modules/**": true
+  },
+
+  // Go 相关：保存时自动格式化
+  "[go]": {
+    "editor.defaultFormatter": "golang.go",
+    "editor.formatOnSave": true,
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4
+  },
+
+  // 前端：使用项目内置的 TypeScript
+  "typescript.tsdk": "web/node_modules/typescript/lib"
+}
