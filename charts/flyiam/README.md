@@ -84,6 +84,7 @@ charts/flyiam/
 | `FLYIAM_NAMESPACE` | 命名空间 | `flyiam` |
 | `FLYIAM_REPLICAS` | 应用副本数 | `2` |
 | `FLYIAM_IMAGE_TAG` | 应用镜像标签 | `latest` |
+| `FLYIAM_IMAGE_PULL_POLICY` | 应用镜像拉取策略 | `Always` |
 | `FLYIAM_NODE_LABEL` / `FLYIAM_NODE_LABEL_VALUE` | 硬性节点亲和性标签 | `flyiam` / `true` |
 | `FLYIAM_DB_HOST` / `FLYIAM_DB_PASSWORD` | 数据库 | - |
 | `FLYIAM_REDIS_HOST` / `FLYIAM_REDIS_PASSWORD` | 缓存 | - |
@@ -95,6 +96,7 @@ charts/flyiam/
 | `FLYIAM_CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码 | `ysyh!9Sky` |
 | `CASDOOR_ENABLED` | 部署内置 Casdoor | `true` |
 | `CASDOOR_IMAGE_TAG` | Casdoor 镜像标签 | `latest` |
+| `CASDOOR_IMAGE_PULL_POLICY` | Casdoor 镜像拉取策略 | `Always` |
 | `CASDOOR_TIMEZONE` | Casdoor 时区 | `Asia/Shanghai` |
 
 > Chart 仅暴露 ClusterIP Service，不包含 Ingress；域名/HTTPS 请在集群入口层（Ingress Controller / Gateway）统一配置。

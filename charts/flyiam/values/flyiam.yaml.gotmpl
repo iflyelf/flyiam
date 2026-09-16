@@ -316,7 +316,7 @@ casdoor:
     registry: {{ .Values.casdoorImageRegistry | quote }}
     repository: {{ .Values.casdoorImageRepository | quote }}
     tag: {{ .Values.casdoorImageTag | quote }}
-    pullPolicy: Always
+    pullPolicy: {{ .Values.casdoorImagePullPolicy | quote }}
   # 副本数（有状态服务，建议单副本）
   replicaCount: {{ .Values.casdoorReplicas }}
   # Service 配置

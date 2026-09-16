@@ -95,6 +95,8 @@ casdoorEnabled: {{ env "CASDOOR_ENABLED" | default "true" }}
 casdoorImageRegistry: '{{ env "CASDOOR_IMAGE_REGISTRY" | default "docker.io" }}'
 casdoorImageRepository: '{{ env "CASDOOR_IMAGE_REPOSITORY" | default "casbin/casdoor" }}'
 casdoorImageTag: '{{ env "CASDOOR_IMAGE_TAG" | default "latest" }}'
+# Casdoor 镜像拉取策略
+casdoorImagePullPolicy: '{{ env "CASDOOR_IMAGE_PULL_POLICY" | default "Always" }}'
 # 副本数（Casdoor 有状态，建议单副本）
 casdoorReplicas: {{ env "CASDOOR_REPLICAS" | default "1" }}
 # Service 与端口

@@ -126,6 +126,8 @@ Casdoor 与 FlyIAM **共用同一数据库**（表前缀 `casdoor_`），
 | `FLYIAM_NAMESPACE` | 命名空间 | `flyiam` |
 | `FLYIAM_REPLICAS` | 应用副本数 | `2` |
 | `FLYIAM_IMAGE_TAG` | 应用镜像标签 | `latest` |
+| `FLYIAM_IMAGE_PULL_POLICY` | 应用镜像拉取策略 | `Always` |
+| `CASDOOR_IMAGE_PULL_POLICY` | Casdoor 镜像拉取策略 | `Always` |
 | `FLYIAM_NODE_LABEL` / `FLYIAM_NODE_LABEL_VALUE` | 硬性节点亲和性标签 | `flyiam` / `true` |
 | `FLYIAM_DB_HOST` | 数据库地址 | `postgres.default.svc.cluster.local` |
 | `FLYIAM_DB_PASSWORD` | 数据库密码 | - |
