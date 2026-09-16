@@ -45,6 +45,23 @@ http://casdoor.example.com    → 80
 标准端口无需显式书写端口号；仅当使用非标准端口时才需写成 `https://casdoor.example.com:8443`。
 该地址同时写入内置 Casdoor 的 `origin`（app.conf），用于生成正确的登录跳转地址。
 
+### Casdoor 自带 Swagger（/swagger）
+
+Casdoor 仅在 **`runmode = dev`** 时注册 `/swagger` 静态路由（见上游 `main.go`），
+因此本 Chart 默认的 **`CASDOOR_RUN_MODE=prod` 下访问 `/swagger` 会返回 404**，
+这是 Casdoor 的设计，不是网络或入口配置问题。
+
+如需临时查看 Swagger UI（**不建议长期用于生产**，dev 模式会同时打开调试错误页与详细日志）：
+
+```bash
+export CASDOOR_RUN_MODE=dev
+helmfile -f helmfile.yaml.gotmpl sync
+# 访问 http://<casdoor>:8000/swagger/
+```
+
+> 生产环境请保持 `prod`。API 文档可参考 Casdoor 官方：
+> https://casdoor.org/docs/basic/server-installation 或上游仓库 `swagger/` 目录。
+
 ## 3. 手动配置（可选）
 
 如需手工维护，登录 Casdoor 管理后台（集群内 `http://<casdoor>:8000`，

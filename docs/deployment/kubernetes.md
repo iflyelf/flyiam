@@ -109,6 +109,11 @@ export FLYIAM_NODE_LABEL_VALUE="true"
 | 运行模式 | `prod` | `CASDOOR_RUN_MODE` |
 | 是否部署 | `true` | `CASDOOR_ENABLED` |
 
+> **关于 `/swagger` 404**：Casdoor 仅在 `runmode = dev` 时注册 `/swagger` 静态路由，
+> 因此默认 `CASDOOR_RUN_MODE=prod` 下访问 `/swagger` 返回 404 属正常现象。
+> 如需临时查看可 `export CASDOOR_RUN_MODE=dev && helmfile sync`（dev 还会开启调试错误页，生产勿用）。
+> 详见 [Casdoor 配置](casdoor.md)。
+
 Casdoor 与 FlyIAM **共用同一数据库**（表前缀 `casdoor_`），
 其 `app.conf` 由 ConfigMap 提供，数据库密码通过 initContainer 注入（不在 ConfigMap 明文保存）。
 
