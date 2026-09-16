@@ -95,6 +95,7 @@ charts/flyiam/
 | `FLYIAM_CASDOOR_AUTO_SETUP` | 自动初始化 Casdoor | `true` |
 | `FLYIAM_CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码 | `ysyh!9Sky` |
 | `CASDOOR_ENABLED` | 部署内置 Casdoor | `true` |
+| `CASDOOR_REPLICAS` | Casdoor 副本数 | `1` |
 | `CASDOOR_IMAGE_TAG` | Casdoor 镜像标签 | `latest` |
 | `CASDOOR_IMAGE_PULL_POLICY` | Casdoor 镜像拉取策略 | `Always` |
 | `CASDOOR_INIT_IMAGE_TAG` | Casdoor initContainer 镜像标签（生成 app.conf） | `1.36` |
