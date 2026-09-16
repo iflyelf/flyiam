@@ -20,6 +20,7 @@ FlyIAM 统一用户管理系统的 Helm Chart，**内置 Casdoor 认证中心**�
 - Kubernetes 1.24+、Helm 3.x、Helmfile 0.150+
 - 外置 PostgreSQL（已创建空库 `flyiam`）
 - 外置 Redis（可选）
+- **目标节点已打上 `flyiam=true` 标签**（硬性节点亲和性要求，见[节点亲和性配置](#节点亲和性配置)）
 
 ## 快速开始
 
@@ -33,6 +34,11 @@ export FLYIAM_DB_USER="flyiam"
 export FLYIAM_DB_PASSWORD="your-db-password"
 export FLYIAM_JWT_SECRET="your-jwt-secret-at-least-32-chars"
 export FLYIAM_ADMIN_PASSWORD="your-admin-password"
+
+# 为目标节点打标签（硬性节点亲和性要求）
+kubectl get nodes
+kubectl label nodes <node-1> flyiam=true
+kubectl label nodes <node-2> flyiam=true
 
 helmfile sync
 ```
@@ -78,6 +84,7 @@ charts/flyiam/
 | `FLYIAM_NAMESPACE` | 命名空间 | `flyiam` |
 | `FLYIAM_REPLICAS` | 应用副本数 | `2` |
 | `FLYIAM_IMAGE_TAG` | 应用镜像标签 | `latest` |
+| `FLYIAM_NODE_LABEL` / `FLYIAM_NODE_LABEL_VALUE` | 硬性节点亲和性标签 | `flyiam` / `true` |
 | `FLYIAM_DB_HOST` / `FLYIAM_DB_PASSWORD` | 数据库 | - |
 | `FLYIAM_REDIS_HOST` / `FLYIAM_REDIS_PASSWORD` | 缓存 | - |
 | `FLYIAM_JWT_SECRET` | JWT 密钥 | - |
@@ -104,6 +111,56 @@ http://casdoor.example.com    → 80
 
 非标准端口才需写成 `https://casdoor.example.com:8443`。该地址同时写入内置 Casdoor 的
 `origin`（app.conf），用于生成正确的登录跳转地址。
+
+## 节点亲和性配置
+
+FlyIAM 应用与内置 Casdoor 均配置了**硬性节点亲和性**，必须调度到带
+`flyiam=true` 标签的 Linux 节点。部署前需为目标节点打标签：
+
+```bash
+# 查看节点
+kubectl get nodes
+
+# 为节点打标签
+kubectl label nodes <node-1> flyiam=true
+kubectl label nodes <node-2> flyiam=true
+
+# 确认标签
+kubectl get nodes -l flyiam=true
+```
+
+渲染后的亲和性规则：
+
+```yaml
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: flyiam        # nodeLabel
+              operator: In
+              values:
+                - "true"          # nodeLabelValue
+            - key: kubernetes.io/os
+              operator: In
+              values:
+                - linux
+  podAntiAffinity:            # 多副本尽量分散到不同节点
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          topologyKey: kubernetes.io/hostname
+```
+
+标签由 `FLYIAM_NODE_LABEL` / `FLYIAM_NODE_LABEL_VALUE` 控制（默认 `flyiam` / `true`）：
+
+```bash
+export FLYIAM_NODE_LABEL="flyiam"
+export FLYIAM_NODE_LABEL_VALUE="true"
+```
+
+> ⚠️ 硬性亲和性不满足时 Pod 会一直 `Pending`，可用
+> `kubectl describe pod -n flyiam <pod>` 查看调度事件。
 
 ## 安装后验证
 
@@ -139,10 +196,30 @@ helmfile sync
 > Secret 需包含 key：`DB_PASSWORD`、`REDIS_PASSWORD`、`JWT_SECRET`、`ADMIN_PASSWORD`。
 > 若应用凭据由自动初始化生成，则无需在 Secret 中提供 `CASDOOR_CLIENT_ID/SECRET`。
 
+## 运维操作
+
+统一在 `charts/flyiam` 目录执行：
+
+```bash
+# 安装部署
+helmfile -f helmfile.yaml.gotmpl sync
+
+# 更新（修改配置/镜像后重新同步）
+helmfile -f helmfile.yaml.gotmpl diff     # 查看变更
+helmfile -f helmfile.yaml.gotmpl sync     # 应用变更
+
+# 指定环境
+helmfile -f helmfile.yaml.gotmpl -e prod sync
+
+# 卸载
+helmfile -f helmfile.yaml.gotmpl destroy
+```
+
 ## 故障排查
 
 | 现象 | 处理 |
 |------|------|
+| Pod Pending（节点亲和性不满足） | `kubectl get nodes -l flyiam=true` 确认节点已打标签，或调整 `FLYIAM_NODE_LABEL` |
 | Pod CrashLoopBackOff | `kubectl logs` 查看；确认数据库可达、`JWT_SECRET` 与 `ADMIN_PASSWORD` 已设置 |
 | Casdoor 未就绪 | FlyIAM 启动时会等待 Casdoor（最多 60s），确认 Casdoor Pod 正常 |
 | 登录报 Redirect URI 错误 | 开启 `FLYIAM_CASDOOR_AUTO_REDIRECT_URI=true` 或手工加入白名单 |

@@ -23,6 +23,7 @@ Chart 仅暴露 ClusterIP Service，不包含 Ingress；域名访问请在集群
 - Helm 3.x、Helmfile 0.150+
 - 外置 PostgreSQL（已创建空库 `flyiam`）
 - 外置 Redis（可选）
+- **目标节点已打上 `flyiam=true` 标签**（硬性节点亲和性要求）
 
 ## 3. 快速部署
 
@@ -48,12 +49,53 @@ export FLYIAM_REDIS_PASSWORD="your-redis-password"
 #     http://casdoor.example.com   → 80
 export FLYIAM_CASDOOR_PUBLIC_ENDPOINT="https://casdoor.example.com"
 
+# 为目标节点打标签（硬性节点亲和性要求）
+kubectl get nodes
+kubectl label nodes <node-1> flyiam=true
+kubectl label nodes <node-2> flyiam=true
+
 # 部署
 helmfile sync
 
 # 指定环境
 helmfile -e prod sync
 ```
+
+### 3.1 节点亲和性
+
+FlyIAM 应用与内置 Casdoor 均配置了**硬性节点亲和性**，必须调度到带
+`flyiam=true` 标签的 Linux 节点：
+
+```bash
+kubectl get nodes                 # 查看节点
+kubectl label nodes <node-1> flyiam=true
+kubectl get nodes -l flyiam=true  # 确认标签
+```
+
+```yaml
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: flyiam          # nodeLabel
+              operator: In
+              values:
+                - "true"            # nodeLabelValue
+            - key: kubernetes.io/os
+              operator: In
+              values:
+                - linux
+```
+
+标签可通过环境变量覆盖：
+
+```bash
+export FLYIAM_NODE_LABEL="flyiam"
+export FLYIAM_NODE_LABEL_VALUE="true"
+```
+
+> 硬性亲和性不满足时 Pod 会一直 `Pending`，用 `kubectl describe pod` 查看调度事件。
 
 ## 4. 内置 Casdoor 说明
 
@@ -84,6 +126,7 @@ Casdoor 与 FlyIAM **共用同一数据库**（表前缀 `casdoor_`），
 | `FLYIAM_NAMESPACE` | 命名空间 | `flyiam` |
 | `FLYIAM_REPLICAS` | 应用副本数 | `2` |
 | `FLYIAM_IMAGE_TAG` | 应用镜像标签 | `latest` |
+| `FLYIAM_NODE_LABEL` / `FLYIAM_NODE_LABEL_VALUE` | 硬性节点亲和性标签 | `flyiam` / `true` |
 | `FLYIAM_DB_HOST` | 数据库地址 | `postgres.default.svc.cluster.local` |
 | `FLYIAM_DB_PASSWORD` | 数据库密码 | - |
 | `FLYIAM_REDIS_HOST` | Redis 地址 | `redis.default.svc.cluster.local` |
@@ -136,8 +179,13 @@ kubectl logs -n flyiam deploy/flyiam | head -30
 ✅ Casdoor 自动初始化完成
 ```
 
-## 8. 卸载
+## 8. 更新与卸载
 
 ```bash
+# 更新（修改配置/镜像后）
+helmfile -f helmfile.yaml.gotmpl diff    # 查看变更
+helmfile -f helmfile.yaml.gotmpl sync    # 应用变更
+
+# 卸载
 helmfile -e default destroy
 ```

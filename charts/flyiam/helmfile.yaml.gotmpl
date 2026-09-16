@@ -126,6 +126,9 @@ releases:
       # 日志配置
       - logLevel: {{ .Values.logLevel | quote }}
       - logFormat: {{ .Values.logFormat | quote }}
+      # 节点调度配置（硬性节点亲和性）
+      - nodeLabel: {{ .Values.nodeLabel | quote }}
+      - nodeLabelValue: {{ .Values.nodeLabelValue | quote }}
       # existingSecret
       - existingSecret: {{ .Values.existingSecret | quote }}
     

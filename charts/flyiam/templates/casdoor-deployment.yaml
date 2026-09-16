@@ -95,6 +95,10 @@ spec:
             failureThreshold: 6
           resources:
             {{- toYaml .Values.casdoor.resources | nindent 12 }}
+      {{- with .Values.casdoor.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: casdoor-config-template
           configMap:
