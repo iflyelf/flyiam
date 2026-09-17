@@ -65,11 +65,18 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="employeeCode" label="工号" width="120" show-overflow-tooltip />
         <el-table-column prop="workEmail" label="邮箱" min-width="180" show-overflow-tooltip />
         <el-table-column prop="phone" label="电话" width="130" />
-        <el-table-column prop="deptNameLv1" label="一级部门" min-width="150" show-overflow-tooltip />
-        <el-table-column prop="deptNameLv2" label="二级部门" min-width="150" show-overflow-tooltip />
+        <!-- 动态字段列：由「用户字段」定义驱动，新增字段无需改代码 -->
+        <el-table-column
+          v-for="f in listFields"
+          :key="f.fieldKey"
+          :label="f.label"
+          min-width="140"
+          show-overflow-tooltip
+        >
+          <template #default="{ row }">{{ extraValue(row, f.fieldKey) || '-' }}</template>
+        </el-table-column>
         <el-table-column label="状态" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small" effect="plain">
@@ -141,14 +148,11 @@
         </el-descriptions-item>
         <el-descriptions-item label="状态">{{ currentUser.status === 'active' ? '正常' : '禁用' }}</el-descriptions-item>
         <el-descriptions-item label="姓名">{{ currentUser.name }}</el-descriptions-item>
-        <el-descriptions-item label="工号">{{ currentUser.employeeCode || '-' }}</el-descriptions-item>
         <el-descriptions-item label="邮箱">{{ currentUser.workEmail || '-' }}</el-descriptions-item>
         <el-descriptions-item label="电话">{{ currentUser.phone || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="编制类型">{{ currentUser.compileType || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="上级账号">{{ currentUser.superiorAccount || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="零级部门">{{ currentUser.deptNameLv0 || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="一级部门">{{ currentUser.deptNameLv1 || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="二级部门" :span="2">{{ currentUser.deptNameLv2 || '-' }}</el-descriptions-item>
+        <el-descriptions-item v-for="f in allFields" :key="f.fieldKey" :label="f.label">
+          {{ extraValue(currentUser, f.fieldKey) || '-' }}
+        </el-descriptions-item>
       </el-descriptions>
     </el-dialog>
 
@@ -161,26 +165,43 @@
         <el-form-item label="姓名" required>
           <el-input v-model="form.name" />
         </el-form-item>
-        <el-form-item label="工号">
-          <el-input v-model="form.employeeCode" />
-        </el-form-item>
         <el-form-item label="邮箱">
           <el-input v-model="form.workEmail" />
         </el-form-item>
         <el-form-item label="手机号">
           <el-input v-model="form.phone" />
         </el-form-item>
-        <el-form-item label="编制类型">
-          <el-input v-model="form.compileType" placeholder="如 正编 / 外包" />
-        </el-form-item>
-        <el-form-item label="上级账号">
-          <el-input v-model="form.superiorAccount" />
-        </el-form-item>
-        <el-form-item label="一级部门">
-          <el-input v-model="form.deptNameLv1" />
-        </el-form-item>
-        <el-form-item label="二级部门">
-          <el-input v-model="form.deptNameLv2" />
+        <!-- 动态字段表单项：由「用户字段」定义驱动（含零级部门等内置字段） -->
+        <el-form-item v-for="f in formFields" :key="f.fieldKey" :label="f.label">
+          <el-input v-if="f.fieldType === 'text'" v-model="form.extra[f.fieldKey]" />
+          <el-input
+            v-else-if="f.fieldType === 'textarea'"
+            v-model="form.extra[f.fieldKey]"
+            type="textarea"
+            :rows="2"
+          />
+          <el-input-number
+            v-else-if="f.fieldType === 'number'"
+            v-model="form.extra[f.fieldKey]"
+            :controls="false"
+            style="width: 100%"
+          />
+          <el-select
+            v-else-if="f.fieldType === 'select'"
+            v-model="form.extra[f.fieldKey]"
+            style="width: 100%"
+            clearable
+          >
+            <el-option v-for="opt in parseOptions(f.options)" :key="opt" :label="opt" :value="opt" />
+          </el-select>
+          <el-date-picker
+            v-else-if="f.fieldType === 'date'"
+            v-model="form.extra[f.fieldKey]"
+            type="date"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+          <el-input v-else v-model="form.extra[f.fieldKey]" />
         </el-form-item>
         <el-form-item v-if="!formIsEdit" label="初始密码">
           <el-input v-model="form.password" type="password" show-password placeholder="留空使用系统默认密码" />
@@ -207,11 +228,48 @@ import {
   resetPassword,
   setUserAdmin
 } from '@/api/user'
+import { listUserFields } from '@/api/userField'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
 const canWrite = computed(() => authStore.hasPermission('user:write'))
 const canDelete = computed(() => authStore.hasPermission('user:delete'))
+
+// 用户字段定义（页面可配置）：驱动列表列与表单动态渲染
+const allFields = ref([])
+const listFields = computed(() => allFields.value.filter((f) => f.showInList))
+const formFields = computed(() => allFields.value.filter((f) => f.showInForm && f.editable))
+
+// extraValue 读取用户扩展字段值（extar 优先，兼容旧版显式字段）
+const extraValue = (row, key) => {
+  if (!row) return ''
+  const v = row.extra?.[key]
+  if (v !== undefined && v !== null && v !== '') return v
+  return row[key] ?? ''
+}
+
+// parseOptions 解析下拉选项（JSON 数组字符串）
+const parseOptions = (options) => {
+  if (!options) return []
+  try {
+    const arr = JSON.parse(options)
+    return Array.isArray(arr) ? arr : []
+  } catch (e) {
+    return String(options)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  }
+}
+
+const loadFields = async () => {
+  try {
+    const res = await listUserFields()
+    allFields.value = res.data || []
+  } catch (e) {
+    allFields.value = []
+  }
+}
 
 const loading = ref(false)
 const saving = ref(false)
@@ -231,15 +289,10 @@ const formIsEdit = ref(false)
 const emptyForm = () => ({
   domainAccount: '',
   name: '',
-  employeeCode: '',
   workEmail: '',
   phone: '',
-  compileType: '',
-  superiorAccount: '',
-  deptNameLv0: '',
-  deptNameLv1: '',
-  deptNameLv2: '',
-  password: ''
+  password: '',
+  extra: {}
 })
 const form = ref(emptyForm())
 
@@ -337,14 +390,9 @@ const openEdit = (row) => {
     ...emptyForm(),
     domainAccount: row.domainAccount,
     name: row.name,
-    employeeCode: row.employeeCode,
     workEmail: row.workEmail,
     phone: row.phone,
-    compileType: row.compileType,
-    superiorAccount: row.superiorAccount,
-    deptNameLv0: row.deptNameLv0,
-    deptNameLv1: row.deptNameLv1,
-    deptNameLv2: row.deptNameLv2
+    extra: { ...(row.extra || {}) }
   }
   formIsEdit.value = true
   formVisible.value = true
@@ -402,7 +450,10 @@ const handleBatchDelete = async () => {
   loadUsers()
 }
 
-onMounted(loadUsers)
+onMounted(() => {
+  loadFields()
+  loadUsers()
+})
 </script>
 
 <style scoped>

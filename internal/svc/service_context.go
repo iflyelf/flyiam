@@ -12,6 +12,7 @@ import (
 
 	"github.com/iflyelf/flyiam/internal/config"
 	"github.com/iflyelf/flyiam/internal/logic/protected"
+	"github.com/iflyelf/flyiam/internal/logic/userfield"
 	"github.com/iflyelf/flyiam/internal/pkg/cache"
 	"github.com/iflyelf/flyiam/internal/pkg/casdoor"
 )
@@ -136,6 +137,14 @@ func initSchema(db *sql.DB, c config.Config) error {
 	// 创建受保护用户表
 	if err := createProtectedUsersTable(db); err != nil {
 		return fmt.Errorf("创建受保护用户表失败: %w", err)
+	}
+
+	// 创建用户字段定义表，并写入内置字段（幂等）
+	if err := createUserFieldDefsTable(db); err != nil {
+		return fmt.Errorf("创建用户字段定义表失败: %w", err)
+	}
+	if err := userfield.NewLogic(sqlx.NewSqlConnFromDB(db)).SeedBuiltin(context.Background()); err != nil {
+		log.Printf("⚠️ 初始化内置用户字段失败: %v", err)
 	}
 
 	// 创建角色 / 团队 / 成员 / 团队角色表
@@ -271,6 +280,31 @@ func createProtectedUsersTable(db *sql.DB) error {
 		domain_account VARCHAR(100) NOT NULL UNIQUE,
 		remark VARCHAR(255),
 		created_at TIMESTAMPTZ DEFAULT NOW()
+	);
+	`
+	_, err := db.Exec(schema)
+	return err
+}
+
+// createUserFieldDefsTable 创建用户字段定义表
+//
+// 表为空时由 SeedBuiltin 写入内置人事字段（empCode/deptNameLv0...），
+// 之后管理员可在页面增删自定义字段、调整显示名与可见性，无需改代码。
+func createUserFieldDefsTable(db *sql.DB) error {
+	schema := `
+	CREATE TABLE IF NOT EXISTS user_field_defs (
+		id BIGSERIAL PRIMARY KEY,
+		field_key VARCHAR(64) NOT NULL UNIQUE,
+		label VARCHAR(128) NOT NULL,
+		field_type VARCHAR(32) NOT NULL DEFAULT 'text',
+		options TEXT DEFAULT '',
+		show_in_list BOOLEAN NOT NULL DEFAULT TRUE,
+		show_in_form BOOLEAN NOT NULL DEFAULT TRUE,
+		editable BOOLEAN NOT NULL DEFAULT TRUE,
+		builtin BOOLEAN NOT NULL DEFAULT FALSE,
+		sort_order INT NOT NULL DEFAULT 0,
+		created_at TIMESTAMPTZ DEFAULT NOW(),
+		updated_at TIMESTAMPTZ DEFAULT NOW()
 	);
 	`
 	_, err := db.Exec(schema)

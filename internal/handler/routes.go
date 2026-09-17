@@ -49,6 +49,12 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodDelete, Path: "/api/users/:name", Handler: perm("user:delete")(DeleteUserHandler(svcCtx))},
 		{Method: http.MethodPost, Path: "/api/users/batch-delete", Handler: perm("user:delete")(BatchDeleteUsersHandler(svcCtx))},
 
+		// 用户字段定义（页面可配置，决定用户列表/表单展示哪些字段）
+		{Method: http.MethodGet, Path: "/api/user-fields", Handler: perm("userfield:read")(ListUserFieldsHandler(svcCtx))},
+		{Method: http.MethodPost, Path: "/api/user-fields", Handler: perm("userfield:write")(CreateUserFieldHandler(svcCtx))},
+		{Method: http.MethodPut, Path: "/api/user-fields/:id", Handler: perm("userfield:write")(UpdateUserFieldHandler(svcCtx))},
+		{Method: http.MethodDelete, Path: "/api/user-fields/:id", Handler: perm("userfield:write")(DeleteUserFieldHandler(svcCtx))},
+
 		// 受保护用户（页面可配置）
 		{Method: http.MethodGet, Path: "/api/protected-users", Handler: perm("user:read")(ListProtectedUsersHandler(svcCtx))},
 		{Method: http.MethodPost, Path: "/api/protected-users", Handler: perm("user:write")(AddProtectedUserHandler(svcCtx))},

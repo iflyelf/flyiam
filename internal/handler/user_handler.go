@@ -25,6 +25,9 @@ type userPayload struct {
 	DeptNameLv1     string `json:"deptNameLv1"`
 	DeptNameLv2     string `json:"deptNameLv2"`
 	Password        string `json:"password"`
+	// Extra 动态字段值（键为 user_field_defs.field_key），
+	// 使新增/编辑用户也能写入任意自定义字段，无需改代码。
+	Extra map[string]string `json:"extra"`
 }
 
 // ListUsersHandler 用户列表（数据来源：Casdoor，服务端分页，避免全量拉取导致卡顿）
@@ -251,6 +254,11 @@ func casdoorToView(svcCtx *svc.ServiceContext, u *casdoorsdk.User) model.UserVie
 	if props == nil {
 		props = map[string]string{}
 	}
+	// 复制一份全部属性，供前端按字段定义动态渲染（不改原 map）
+	extra := make(map[string]string, len(props))
+	for k, v := range props {
+		extra[k] = v
+	}
 	status := "active"
 	if u.IsForbidden {
 		status = "forbidden"
@@ -270,6 +278,8 @@ func casdoorToView(svcCtx *svc.ServiceContext, u *casdoorsdk.User) model.UserVie
 		DeptNameLv2:     props["deptNameLv2"],
 		Status:          status,
 		CasdoorSynced:   true,
+		IsAdmin:         u.IsAdmin,
+		Extra:           extra,
 	}
 	if svcCtx.CasdoorClient != nil {
 		view.IsProtected = svcCtx.CasdoorClient.IsProtected(u.Name)
@@ -315,9 +325,12 @@ func applyUserPayload(svcCtx *svc.ServiceContext, u *casdoorsdk.User, p *userPay
 	}
 }
 
-// payloadProps 提取人事属性
+// payloadProps 提取用户属性（内置人事字段 + 自定义扩展字段）
+//
+// 自定义字段来自 Extra（键为 user_field_defs.field_key），
+// 因此数据源/字段变化无需改代码，只需在页面维护字段定义。
 func payloadProps(p *userPayload) map[string]string {
-	return map[string]string{
+	props := map[string]string{
 		"empCode":     p.EmployeeCode,
 		"compileType": p.CompileType,
 		"deptNameLv0": p.DeptNameLv0,
@@ -326,6 +339,14 @@ func payloadProps(p *userPayload) map[string]string {
 		"superior":    p.SuperiorAccount,
 		"source":      "manual",
 	}
+	for k, v := range p.Extra {
+		k = strings.TrimSpace(k)
+		if k == "" {
+			continue
+		}
+		props[k] = v
+	}
+	return props
 }
 
 // atoiDefault 字符串转 int，失败返回默认值

@@ -122,7 +122,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   UserFilled, SwitchButton, Odometer, User, Refresh, Document,
-  Setting, ArrowDown, Timer, Connection, Lock, Grid, OfficeBuilding
+  Setting, ArrowDown, Timer, Connection, Lock, Grid, OfficeBuilding, SetUp
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
@@ -156,6 +156,7 @@ const mainMenus = [
 // 人员组织子菜单
 const orgMenus = [
   { path: '/users', label: '用户管理', icon: User, perm: 'user:read' },
+  { path: '/user-fields', label: '用户字段', icon: SetUp, perm: 'userfield:read' },
   { path: '/teams', label: '团队管理', icon: Grid, perm: 'team:read' },
   { path: '/roles', label: '角色管理', icon: UserFilled, perm: 'role:read' }
 ]

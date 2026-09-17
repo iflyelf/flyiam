@@ -39,6 +39,7 @@ type TeamMember struct {
 // 系统权限清单（前端展示与后端校验共用）
 var AllPermissions = []string{
 	"user:read", "user:write", "user:delete",
+	"userfield:read", "userfield:write",
 	"team:read", "team:write", "team:delete",
 	"role:read", "role:write", "role:delete",
 	"sync:read", "sync:write",

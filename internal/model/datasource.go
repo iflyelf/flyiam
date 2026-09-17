@@ -41,4 +41,9 @@ type UserView struct {
 	Status          string `json:"status"` // 在职状态
 	CasdoorSynced   bool   `json:"casdoorSynced"`
 	IsProtected     bool   `json:"isProtected"` // 受保护用户（不允许删除）
+	IsAdmin         bool   `json:"isAdmin"`     // 是否管理员
+	// Extra 为用户全部扩展属性（Casdoor User.Properties），
+	// 键与用户字段定义 user_field_defs.field_key 对应，
+	// 前端据此动态渲染自定义字段的列表列与表单项。
+	Extra map[string]string `json:"extra"`
 }
