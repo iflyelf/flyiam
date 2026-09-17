@@ -37,9 +37,21 @@ func main() {
 		return
 	}
 
-	// 加载配置
+	// 加载配置：
+	//  1. 配置文件存在：读取文件（字段上的 env 标签会自动应用环境变量覆盖）；
+	//  2. 文件不存在：回退为代码内置默认值 + 环境变量，支持纯环境变量部署（如 Kubernetes）；
+	//  3. 其它错误（权限等）：直接报错退出。
 	var c config.Config
-	conf.MustLoad(*configFile, &c)
+	if _, statErr := os.Stat(*configFile); statErr == nil {
+		conf.MustLoad(*configFile, &c)
+	} else if os.IsNotExist(statErr) {
+		fmt.Fprintf(os.Stderr, "⚠️  配置文件 %s 不存在，改用内置默认值 + 环境变量\n", *configFile)
+		if err := conf.FillDefault(&c); err != nil {
+			logx.Must(err)
+		}
+	} else {
+		logx.Must(statErr)
+	}
 
 	// 环境变量覆盖（支持容器编排自定义端口/地址等）
 	c.ApplyEnvOverrides()

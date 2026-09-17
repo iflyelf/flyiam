@@ -147,6 +147,13 @@ func (c *Config) ApplyEnvOverrides() {
 			c.Timeout = t
 		}
 	}
+	// 兜底默认值：纯环境变量部署（无配置文件）且未设置 SERVER_PORT 时避免监听 0 端口
+	if c.Host == "" {
+		c.Host = "0.0.0.0"
+	}
+	if c.Port == 0 {
+		c.Port = 8081
+	}
 
 	// Permission AdminUsers 支持环境变量（逗号分隔）
 	if v := os.Getenv("PERMISSION_ADMIN_USERS"); v != "" {

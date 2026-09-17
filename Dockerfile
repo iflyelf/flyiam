@@ -290,6 +290,11 @@ RUN set -eux && \
     mkdir -p /app/config /app/logs && \
     chown -R flyiam:flyiam /app
 
+# ***** 内置默认配置 *****
+# 仓库中的 etc/config.yaml 已完全脱敏，作为镜像默认配置，保证开箱即用；
+# 运行时可用环境变量覆盖任意项，或挂载卷替换 /app/config/config.yaml
+COPY --chown=flyiam:flyiam etc/config.yaml /app/config/config.yaml
+
 # ***** 运行配置 *****
 WORKDIR /app
 USER flyiam
