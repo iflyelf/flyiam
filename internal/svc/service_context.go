@@ -437,7 +437,7 @@ func initCasdoorClient(db *sql.DB, c config.Config) (*casdoor.Client, error) {
 	// Casdoor 权限模型中只有 built-in 身份是全局管理员，业务应用凭据会报
 	// "Unauthorized operation" / "Please sign in first"。
 	if id, secret, err := casdoor.ReadBuiltinApp(db); err != nil {
-		log.Printf("⚠️ 读取 Casdoor 内置应用凭据失败（应用/组织管理功能将不可用）: %v", err)
+		log.Printf("⚠️ 读取 Casdoor 内置应用凭据失败（应用/组织管理功能暂不可用）: %v", err)
 	} else {
 		cfg.AdminClientId = id
 		cfg.AdminClientSecret = secret
@@ -447,6 +447,13 @@ func initCasdoorClient(db *sql.DB, c config.Config) (*casdoor.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("创建 Casdoor 客户端失败: %w", err)
 	}
+
+	// 注入补读方式 + 后台自动重试：Casdoor 首次建表可能晚于本服务，
+	// 这样无需人工重启即可自动恢复（每 10s 重试，最多 1 小时）。
+	client.SetAdminCredentialLoader(func() (string, string, error) {
+		return casdoor.ReadBuiltinApp(db)
+	})
+	client.WatchAdminCredentials(10*time.Second, 360)
 
 	// 测试连接
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

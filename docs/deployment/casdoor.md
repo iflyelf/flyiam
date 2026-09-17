@@ -99,10 +99,28 @@ FlyIAM 启动时会读取内置应用 `app-built-in` 的凭据（`CASDOOR_AUTO_S
 创建后即为共享数据库中的 `casdoor_application` 记录），并创建一个**独立的管理客户端**，
 仅「应用 / 组织管理」接口使用它。业务接口仍用业务凭据，两者互不干扰。
 
-> 该机制无需额外配置。若日志出现
-> `⚠️ 读取 Casdoor 内置应用凭据失败（应用/组织管理功能将不可用）`，
-> 说明 `casdoor_application` 表中没有 `app-built-in`
-> （通常是 Casdoor 未初始化完成），此时应用/组织管理页面会返回明确提示。
+**自动恢复（无需人工重启）**：Casdoor 首次建表可能晚于 FlyIAM 启动，
+因此 FlyIAM 做了两层兜底：
+
+1. **按需补读**：首次访问应用/组织管理接口时，若凭据仍缺失会自动补读一次（失败有 30s 节流）；
+2. **后台重试**：启动后每 10s 重试一次，最长 1 小时，成功即打印
+   `✅ Casdoor 管理凭据已就绪（内置应用 app-built-in）`。
+
+只有在 Casdoor 长时间未完成初始化（`casdoor_application` 表始终没有 `app-built-in`）时，
+管理页面才会持续返回「管理凭据未就绪」。此时请排查 Casdoor 自身状态：
+
+```bash
+# Casdoor 是否在用同一个库、表前缀是否正确
+kubectl exec -n flyiam deploy/flyiam-casdoor -- grep -E "dbName|tableNamePrefix" /conf/app.conf
+
+# Casdoor 启动日志
+kubectl logs -n flyiam deploy/flyiam-casdoor | tail -50
+
+# app-built-in 是否存在
+psql "$DATABASE_URL" -c "SELECT name FROM casdoor_application WHERE name='app-built-in';"
+```
+
+> 该警告**只影响应用/组织管理页面**，登录与用户管理功能不受影响。
 
 ## 3.2 多副本与会话共享（重要）
 

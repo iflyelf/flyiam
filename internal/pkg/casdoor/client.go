@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -15,16 +16,28 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
+// adminRetryInterval 管理凭据补读的最小间隔（失败节流，避免每次请求都查库）
+const adminRetryInterval = 30 * time.Second
+
 // Client Casdoor 客户端
 type Client struct {
 	config       *Config
 	authConfig   *casdoorsdk.AuthConfig
 	organization string
 	application  string
+
 	// adminSDK 使用内置应用 app-built-in 凭据的独立 SDK 实例，
 	// 专用于「应用 / 组织管理」等需要全局管理员权限的接口。
 	// 使用实例客户端而非全局函数，避免与业务凭据的全局配置互相覆盖。
-	adminSDK *casdoorsdk.Client
+	//
+	// 该凭据可能因 Casdoor 晚于本服务启动而暂时读不到，故支持运行时补读：
+	//   - adminCredLoader 由调用方注入（从数据库读取 app-built-in 凭据）；
+	//   - adminClient() 在缺失时按需补读（带失败节流）；
+	//   - WatchAdminCredentials() 后台重试，无需重启服务。
+	adminMu          sync.RWMutex
+	adminSDK         *casdoorsdk.Client
+	adminCredLoader  func() (string, string, error)
+	adminLastAttempt time.Time
 
 	protected   map[string]struct{}
 	protectedMu sync.RWMutex
@@ -129,18 +142,6 @@ func NewClient(cfg *Config) (*Client, error) {
 
 	// 内置应用（app-built-in）凭据：用于应用 / 组织管理等全局管理员接口。
 	// 用独立的实例客户端，不触碰全局配置，避免与业务凭据互相覆盖。
-	var adminSDK *casdoorsdk.Client
-	if cfg.AdminClientId != "" && cfg.AdminClientSecret != "" {
-		adminSDK = casdoorsdk.NewClient(
-			cfg.Endpoint,
-			cfg.AdminClientId,
-			cfg.AdminClientSecret,
-			"",
-			"built-in",
-			"app-built-in",
-		)
-	}
-
 	protected := make(map[string]struct{}, len(cfg.ProtectedUsers)+1)
 	for _, name := range cfg.ProtectedUsers {
 		if name != "" {
@@ -149,24 +150,130 @@ func NewClient(cfg *Config) (*Client, error) {
 	}
 	protected["admin"] = struct{}{}
 
-	return &Client{
+	c := &Client{
 		config:       cfg,
 		authConfig:   authConfig,
 		organization: cfg.OrganizationName,
 		application:  cfg.ApplicationName,
-		adminSDK:     adminSDK,
 		protected:    protected,
-	}, nil
+	}
+	if cfg.AdminClientId != "" && cfg.AdminClientSecret != "" {
+		c.adminSDK = newAdminSDK(cfg.Endpoint, cfg.AdminClientId, cfg.AdminClientSecret)
+	}
+	return c, nil
+}
+
+// newAdminSDK 构建使用内置应用凭据的 SDK 实例（全局管理员身份）
+func newAdminSDK(endpoint, clientId, clientSecret string) *casdoorsdk.Client {
+	return casdoorsdk.NewClient(endpoint, clientId, clientSecret, "", "built-in", "app-built-in")
+}
+
+// SetAdminCredentialLoader 注入内置应用凭据的读取方式（通常从数据库读取）。
+// 注入后，若启动时未取到凭据，会在首次使用管理接口时按需补读，并可配合
+// WatchAdminCredentials 在后台自动重试，无需重启服务。
+func (c *Client) SetAdminCredentialLoader(fn func() (string, string, error)) {
+	c.adminMu.Lock()
+	c.adminCredLoader = fn
+	c.adminMu.Unlock()
+}
+
+// AdminReady 管理凭据（内置应用）是否已就绪
+func (c *Client) AdminReady() bool {
+	c.adminMu.RLock()
+	defer c.adminMu.RUnlock()
+	return c.adminSDK != nil
+}
+
+// tryLoadAdmin 尝试补读内置应用凭据（线程安全，失败后按 adminRetryInterval 节流）。
+//
+// force=true 时忽略节流（供后台定时任务使用）。
+func (c *Client) tryLoadAdmin(force bool) error {
+	c.adminMu.Lock()
+	defer c.adminMu.Unlock()
+
+	if c.adminSDK != nil {
+		return nil
+	}
+	if c.adminCredLoader == nil {
+		return fmt.Errorf("未注入内置应用凭据读取方式")
+	}
+	if !force && !c.adminLastAttempt.IsZero() && time.Since(c.adminLastAttempt) < adminRetryInterval {
+		return fmt.Errorf("Casdoor 内置应用凭据尚未就绪（读取失败，%s 内不重试）", adminRetryInterval)
+	}
+	c.adminLastAttempt = time.Now()
+
+	id, secret, err := c.adminCredLoader()
+	if err != nil {
+		return err
+	}
+	if id == "" || secret == "" {
+		return fmt.Errorf("Casdoor 内置应用凭据为空")
+	}
+
+	c.adminSDK = newAdminSDK(c.config.Endpoint, id, secret)
+	c.config.AdminClientId = id
+	c.config.AdminClientSecret = secret
+	return nil
+}
+
+// WatchAdminCredentials 后台重试补读管理凭据，直到成功或达到最大尝试次数。
+//
+// 场景：Casdoor 首次启动建表（app-built-in）可能晚于 FlyIAM，启动时读不到凭据。
+// 该方法让服务自动恢复，无需人工重启。
+func (c *Client) WatchAdminCredentials(interval time.Duration, maxAttempts int) {
+	if c.AdminReady() {
+		return
+	}
+	if interval <= 0 {
+		interval = 10 * time.Second
+	}
+	go func() {
+		for i := 0; i < maxAttempts; i++ {
+			time.Sleep(interval)
+			if c.AdminReady() {
+				return
+			}
+			if err := c.tryLoadAdmin(true); err == nil {
+				log.Printf("✅ Casdoor 管理凭据已就绪（内置应用 app-built-in），应用/组织管理功能可用")
+				return
+			}
+		}
+		if !c.AdminReady() {
+			log.Printf("⚠️ 已重试 %d 次仍未读到 Casdoor 内置应用凭据，应用/组织管理功能暂不可用"+
+				"（请确认 casdoor_application 表中存在 app-built-in）", maxAttempts)
+		}
+	}()
 }
 
 // adminClient 返回具备全局管理员权限的 SDK 实例（内置应用 app-built-in）。
 // 应用 / 组织管理等全局接口必须用它，业务应用凭据会因权限不足被 Casdoor 拒绝。
+//
+// 凭据缺失时会按需补读一次（节流），因此 Casdoor 晚于本服务就绪后可自动恢复。
 func (c *Client) adminClient() (*casdoorsdk.Client, error) {
-	if c.adminSDK == nil {
-		return nil, fmt.Errorf("Casdoor 管理凭据未就绪（未能读取内置应用 app-built-in），应用/组织管理功能不可用；" +
-			"请确认 CASDOOR_AUTO_SETUP 已开启或 Casdoor 已初始化")
+	c.adminMu.RLock()
+	sdk := c.adminSDK
+	c.adminMu.RUnlock()
+	if sdk != nil {
+		return sdk, nil
 	}
+
+	if err := c.tryLoadAdmin(false); err != nil {
+		return nil, fmt.Errorf("Casdoor 管理凭据未就绪（未能读取内置应用 app-built-in）: %w", err)
+	}
+
+	c.adminMu.RLock()
+	defer c.adminMu.RUnlock()
 	return c.adminSDK, nil
+}
+
+// adminCreds 返回内置应用凭据（供需要直连 HTTP 的接口使用）
+func (c *Client) adminCreds() (string, string, error) {
+	if _, err := c.adminClient(); err != nil {
+		return "", "", err
+	}
+	c.adminMu.RLock()
+	defer c.adminMu.RUnlock()
+	return c.config.AdminClientId, c.config.AdminClientSecret, nil
 }
 
 // Organization 返回当前组织名
@@ -280,15 +387,16 @@ func (c *Client) EnsureRedirectURI(redirectURI string) (bool, error) {
 // 权限：组织属于全局对象，且控制器要求当前身份为全局管理员，
 // 故必须使用内置应用（app-built-in）凭据，业务凭据会报 "Please sign in first"。
 func (c *Client) ListOrganizations() ([]*casdoorsdk.Organization, error) {
-	if c.config.AdminClientId == "" || c.config.AdminClientSecret == "" {
-		return nil, fmt.Errorf("Casdoor 管理凭据未就绪（未能读取内置应用 app-built-in），组织管理功能不可用")
+	adminID, adminSecret, err := c.adminCreds()
+	if err != nil {
+		return nil, err
 	}
 	endpoint := strings.TrimRight(c.config.Endpoint, "/") + "/api/get-organizations"
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("构建请求失败: %w", err)
 	}
-	req.SetBasicAuth(c.config.AdminClientId, c.config.AdminClientSecret)
+	req.SetBasicAuth(adminID, adminSecret)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -623,8 +731,8 @@ func (c *Client) GetOrganizations() ([]*casdoorsdk.Organization, error) {
 // 优先用内置应用凭据（可读任意组织）；未就绪时回退业务凭据
 // （业务凭据可读自身组织，供启动健康检查与用户同步使用）。
 func (c *Client) GetOrganization(name string) (*casdoorsdk.Organization, error) {
-	if c.adminSDK != nil {
-		if org, err := c.adminSDK.GetOrganization(name); err == nil && org != nil {
+	if sdk, err := c.adminClient(); err == nil {
+		if org, err := sdk.GetOrganization(name); err == nil && org != nil {
 			return org, nil
 		}
 	}
