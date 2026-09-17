@@ -18,9 +18,9 @@ environment: '{{ env "FLYIAM_ENVIRONMENT" | default "production" }}'
 
 # ==================== 镜像配置 ====================
 # FlyIAM 镜像仓库地址
-imageRegistry: '{{ env "FLYIAM_IMAGE_REGISTRY" | default "docker.io" }}'
+imageRegistry: '{{ env "FLYIAM_IMAGE_REGISTRY" | default "swr.cn-east-3.myhuaweicloud.com" }}'
 # FlyIAM 镜像仓库路径
-imageRepository: '{{ env "FLYIAM_IMAGE_REPOSITORY" | default "iflyelf/flyiam" }}'
+imageRepository: '{{ env "FLYIAM_IMAGE_REPOSITORY" | default "danxiaonuo/flyiam" }}'
 # FlyIAM 镜像标签
 imageTag: '{{ env "FLYIAM_IMAGE_TAG" | default "latest" }}'
 # 镜像拉取策略

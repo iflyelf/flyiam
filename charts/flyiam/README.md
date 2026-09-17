@@ -87,6 +87,8 @@ charts/flyiam/
 |------|------|------|
 | `FLYIAM_NAMESPACE` | 命名空间 | `flyiam` |
 | `FLYIAM_REPLICAS` | 应用副本数 | `2` |
+| `FLYIAM_IMAGE_REGISTRY` | 应用镜像仓库（华为云，国内可访问） | `swr.cn-east-3.myhuaweicloud.com` |
+| `FLYIAM_IMAGE_REPOSITORY` | 应用镜像路径 | `danxiaonuo/flyiam` |
 | `FLYIAM_IMAGE_TAG` | 应用镜像标签 | `latest` |
 | `FLYIAM_IMAGE_PULL_POLICY` | 应用镜像拉取策略 | `Always` |
 | `FLYIAM_NODE_LABEL` / `FLYIAM_NODE_LABEL_VALUE` | 硬性节点亲和性标签 | `flyiam` / `true` |
