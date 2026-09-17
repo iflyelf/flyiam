@@ -27,9 +27,12 @@ type Config struct {
 	}
 
 	JWT struct {
-		Secret        string `json:",env=JWT_SECRET"`
-		AccessExpire  int64  `json:",default=7200,env=JWT_ACCESS_EXPIRE"`    // 2 hours
-		RefreshExpire int64  `json:",default=604800,env=JWT_REFRESH_EXPIRE"` // 7 days
+		Secret string `json:",env=JWT_SECRET"`
+		// 注意：go-zero 会把带 env 标签的 int64 字段当作 time.Duration 解析，
+		// 导致 JWT_ACCESS_EXPIRE=7200 报 "missing unit in duration"。
+		// 此处使用 int（单位：秒），env 传纯数字即可。
+		AccessExpire  int `json:",default=7200,env=JWT_ACCESS_EXPIRE"`    // 2 hours
+		RefreshExpire int `json:",default=604800,env=JWT_REFRESH_EXPIRE"` // 7 days
 		Issuer        string `json:",default=flyiam,env=JWT_ISSUER"`
 	}
 
