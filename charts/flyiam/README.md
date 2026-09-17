@@ -75,6 +75,10 @@ charts/flyiam/
 | staging | flyiam-staging | 2 | 2 |
 | prod | flyiam | 3 | 2 |
 
+> ⚠️ Pod 反亲和为**硬性打散**（`required`），带 `flyiam=true` 标签的节点数需
+> **≥ 应用副本数 + Casdoor 副本数**（prod 为 `3 + 2 = 5`）。
+> 启用 HPA 时上限同样受节点数限制（`maxReplicas` 过大将出现 Pending）。
+
 ## 关键配置
 
 `values/_base.yaml.gotmpl` 集中管理（全部支持环境变量覆盖）：
@@ -149,11 +153,15 @@ affinity:
               operator: In
               values:
                 - linux
-  podAntiAffinity:            # 多副本尽量分散到不同节点
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        podAffinityTerm:
-          topologyKey: kubernetes.io/hostname
+  podAntiAffinity:            # 硬性打散：同一 release 的 Pod 不共节点
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - flyiam
+        topologyKey: kubernetes.io/hostname
 ```
 
 标签由 `FLYIAM_NODE_LABEL` / `FLYIAM_NODE_LABEL_VALUE` 控制（默认 `flyiam` / `true`）：
@@ -163,8 +171,13 @@ export FLYIAM_NODE_LABEL="flyiam"
 export FLYIAM_NODE_LABEL_VALUE="true"
 ```
 
-> ⚠️ 硬性亲和性不满足时 Pod 会一直 `Pending`，可用
+> ⚠️ **硬性调度**：节点数不满足时 Pod 会一直 `Pending`，可用
 > `kubectl describe pod -n flyiam <pod>` 查看调度事件。
+>
+> 打散为硬性（`required`），**带 `flyiam=true` 标签的节点数需 ≥ 4**
+> （应用默认 2 副本 + 内置 Casdoor 默认 2 副本，两者共用
+> `app.kubernetes.io/name=flyiam` 标签、互相排斥）。
+> 节点不足时可下调副本数：`FLYIAM_REPLICAS` / `CASDOOR_REPLICAS`。
 
 ## 安装后验证
 

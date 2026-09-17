@@ -74,18 +74,17 @@ affinity:
               operator: In
               values:
                 - linux
-  # Pod 反亲和性（避免多副本调度到同一节点）
+  # Pod 反亲和性（硬性打散：同一 release 的 Pod 不调度到同一节点）
+  # ⚠️ 硬性要求：带 nodeLabel 标签的节点数需 ≥ 各 Deployment 副本数之和，否则 Pod 会 Pending
   podAntiAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        podAffinityTerm:
-          labelSelector:
-            matchExpressions:
-              - key: app.kubernetes.io/name
-                operator: In
-                values:
-                  - flyiam
-          topologyKey: kubernetes.io/hostname
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - flyiam
+        topologyKey: kubernetes.io/hostname
 
 tolerations: []
 
@@ -354,7 +353,7 @@ casdoor:
       memory: {{ .Values.casdoorResourcesLimitsMemory | quote }}
   # 对外访问地址（浏览器可达，用于 Casdoor origin）
   origin: {{ .Values.casdoorPublicEndpoint | quote }}
-  # 硬性节点亲和性：与 FlyIAM 应用一致，调度到带 nodeLabel 标签的 Linux 节点
+  # 硬性节点亲和性 + Pod 反亲和性（与 FlyIAM 应用一致）
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -368,4 +367,15 @@ casdoor:
                 operator: In
                 values:
                   - linux
+    # 硬性打散：Casdoor 副本之间、以及与 FlyIAM 应用之间不共节点
+    # （两者共用 app.kubernetes.io/name=flyiam 标签，故互相排斥）
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - flyiam
+          topologyKey: kubernetes.io/hostname
   # 数据库密码从 Secret 注入（DB_PASSWORD）
