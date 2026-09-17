@@ -17,8 +17,28 @@
 |--------|------|
 | `DOCKER_USERNAME` | Docker Hub 用户名（如 `iflyelf`） |
 | `DOCKER_PASSWORD` | Docker Hub 密码或访问令牌 |
+| `SWR_USERNAME` | 华为云 SWR 登录用户名（`docker login -u` 的值，如 `cn-east-3@<AccessKeyId>`） |
+| `SWR_PASSWORD` | 华为云 SWR 登录密码（`docker login -p` 的值） |
 
 `GITHUB_TOKEN` 由 Actions 自动提供，无需配置（用于发布 Release）。
+
+### 华为云 SWR（国内替代 docker.io）
+
+镜像同时推送到华为云 SWR，解决国内拉取 `docker.io` 困难的问题。
+Registry 与组织名在 `publish.yml` 顶部的 `env` 中配置，可直接修改：
+
+```yaml
+env:
+  SWR_REGISTRY: swr.cn-east-3.myhuaweicloud.com
+  SWR_ORGANIZATION: danxiaonuo
+```
+
+配置 Secrets（值取自华为云 SWR 控制台的「登录指令」）：
+
+```bash
+gh secret set SWR_USERNAME -b "cn-east-3@<AccessKeyId>" -R iflyelf/flyiam
+gh secret set SWR_PASSWORD -b "<登录密码>" -R iflyelf/flyiam
+```
 
 ## 3. 触发方式
 
@@ -28,7 +48,9 @@
 
 ## 4. 产物
 
-- 容器镜像：`<DOCKER_USERNAME>/flyiam:latest`、`<DOCKER_USERNAME>/flyiam:latest-<短提交>`（amd64/arm64）
+- 容器镜像（amd64/arm64）：
+  - Docker Hub：`<DOCKER_USERNAME>/flyiam:latest`、`<DOCKER_USERNAME>/flyiam:latest-<短提交>`
+  - 华为云 SWR：`swr.cn-east-3.myhuaweicloud.com/danxiaonuo/flyiam:latest`、`...:latest-<短提交>`
 - GitHub Release（`latest` 标签）二进制：
   - `flyiam-linux-amd64.tar.gz` / `flyiam-linux-arm64.tar.gz`
   - `flyiam-darwin-amd64.tar.gz` / `flyiam-darwin-arm64.tar.gz`
@@ -53,6 +75,11 @@
 ```bash
 # 多架构构建（需 buildx）
 docker buildx build --platform linux/amd64,linux/arm64 -t iflyelf/flyiam:latest .
+
+# 本地推送到华为云 SWR
+docker login -u cn-east-3@<AccessKeyId> -p <登录密码> swr.cn-east-3.myhuaweicloud.com
+docker tag iflyelf/flyiam:latest swr.cn-east-3.myhuaweicloud.com/danxiaonuo/flyiam:latest
+docker push swr.cn-east-3.myhuaweicloud.com/danxiaonuo/flyiam:latest
 
 # 交叉编译二进制（CGO_ENABLED=0，纯静态）
 cd web && npm ci && npm run build && cd ..

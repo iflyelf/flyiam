@@ -6,6 +6,12 @@
 
 name: 构建并发布(latest)
 
+# 镜像推送目标（华为云 SWR: 国内可访问, 替代 docker.io）
+# 组织名称可直接修改, 凭据通过 Secrets: SWR_USERNAME / SWR_PASSWORD
+env:
+  SWR_REGISTRY: swr.cn-east-3.myhuaweicloud.com
+  SWR_ORGANIZATION: danxiaonuo
+
 # 推送到 main 或手动触发即构建, 二进制与镜像统一发布到 latest
 on:
   push:
@@ -136,7 +142,11 @@ jobs:
             ### 🐳 Docker 镜像
 
             ```bash
+            # Docker Hub（国外）
             docker pull iflyelf/flyiam:latest
+
+            # 华为云 SWR（国内推荐）
+            docker pull swr.cn-east-3.myhuaweicloud.com/danxiaonuo/flyiam:latest
             ```
 
             ### 🚀 快速开始
@@ -219,6 +229,13 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: 登录华为云 SWR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.SWR_REGISTRY }}
+          username: ${{ secrets.SWR_USERNAME }}
+          password: ${{ secrets.SWR_PASSWORD }}
+
       - name: 构建并推送镜像(仅 latest)
         uses: docker/build-push-action@v6
         with:
@@ -233,6 +250,8 @@ jobs:
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/flyiam:latest
             ${{ secrets.DOCKER_USERNAME }}/flyiam:${{ steps.ver.outputs.version }}
+            ${{ env.SWR_REGISTRY }}/${{ env.SWR_ORGANIZATION }}/flyiam:latest
+            ${{ env.SWR_REGISTRY }}/${{ env.SWR_ORGANIZATION }}/flyiam:${{ steps.ver.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
