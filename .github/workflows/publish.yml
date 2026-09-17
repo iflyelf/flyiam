@@ -239,15 +239,15 @@ jobs:
       - name: 构建并推送镜像(仅 latest)
         uses: docker/build-push-action@v6
         # 华为云 SWR 不支持 OCI media types 与证明清单(attestation)，
-        # 否则报 "Invalid image, fail to parse 'manifest.json'"；
-        # 关闭默认 attestation 并输出 Docker 媒体类型以兼容 SWR。
-        env:
-          BUILDX_NO_DEFAULT_ATTESTATIONS: true
+        # 否则报 "Invalid image, fail to parse 'manifest.json'"。
+        # 关闭 provenance/sbom 并输出 Docker 媒体类型以兼容 SWR。
         with:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          provenance: false
+          sbom: false
           outputs: type=image,oci-mediatypes=false
           build-args: |
             VERSION=${{ steps.ver.outputs.version }}
