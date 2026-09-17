@@ -29,6 +29,12 @@ type BootstrapResult struct {
 //
 // 返回的 ClientId/ClientSecret 为业务应用最终生效的凭据，供运行时客户端使用。
 func EnsureSetup(db *sql.DB, cfg *Config) (*BootstrapResult, error) {
+	// 0. 端点自检：确认 Endpoint 指向的是 Casdoor API 而非前端页面/其他服务，
+	//    否则 SDK 调用会以 JSON 解析错误（invalid character '<'）失败，难以定位。
+	if err := ProbeAPI(cfg.Endpoint); err != nil {
+		return nil, err
+	}
+
 	// 1. 读取内置应用凭据（Casdoor 首次启动会自动创建 app-built-in）
 	builtinID, builtinSecret, err := readBuiltinApp(db)
 	if err != nil {

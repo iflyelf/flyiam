@@ -142,5 +142,6 @@ Casdoor 首次启动会自动创建其全部表，无需手工执行 SQL。
 | 登录时报 `Unauthorized operation` | Casdoor 多副本会话不共享：确认 `CASDOOR_REDIS_SESSION_ENABLED=true` 且各副本可访问同一 Redis；或将 `CASDOOR_REPLICAS` 设为 `1` |
 | 手机号校验失败 | 确认 `FLYIAM_CASDOOR_COUNTRY_CODE=CN`（组织默认区域影响手机号解析） |
 | 自动初始化失败 | 确认 Casdoor 已就绪且 `casdoor_application` 中存在 `app-built-in` |
+| 报 `invalid character '<' looking for beginning of value` | `CASDOOR_ENDPOINT` 指向的不是 Casdoor API（返回了 HTML，如前端页面/Ingress 首页）。用 `kubectl exec -n flyiam deploy/flyiam -- curl -sS -i "$CASDOOR_ENDPOINT/api/health" \| head` 确认应返回 JSON `{"status":"ok"}`；集群内正确值通常为 `http://casdoor:8000` |
 | 修改了 `CASDOOR_DEFAULT_PASSWORD` 但 Casdoor 登录仍为 `123` | `123` 是 Casdoor 内置管理员 `built-in/admin` 的硬编码密码，不受配置影响；业务管理员请用 `flyiam/admin` + 配置的默认密码登录 |
 | 不知道 Casdoor 后台登录密码 | 内置管理员 `admin` / `123`（首次登录请立即修改） |

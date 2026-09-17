@@ -619,16 +619,50 @@ func (c *Client) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
-// Ping 探测 Casdoor 服务是否可用（用于启动等待）
-func Ping(endpoint string) bool {
+// ProbeAPI 校验 endpoint 指向的是否为可用的 Casdoor API。
+//
+// /api/health 应返回 JSON（{"status":"ok"}）。若返回 HTML（例如端点误指向
+// 前端页面、Ingress 首页、或是其他 Web 服务），后续 SDK 调用会报
+// "invalid character '<' looking for beginning of value"，此处提前给出明确错误。
+func ProbeAPI(endpoint string) error {
 	if endpoint == "" {
-		return false
+		return fmt.Errorf("Casdoor 端点未配置（请设置 CASDOOR_ENDPOINT）")
 	}
-	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Get(strings.TrimRight(endpoint, "/") + "/api/health")
+	url := strings.TrimRight(endpoint, "/") + "/api/health"
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
 	if err != nil {
-		return false
+		return fmt.Errorf("无法访问 Casdoor 端点 %s: %w（请确认地址可达、Service/DNS 正确）", url, err)
 	}
 	defer resp.Body.Close()
-	return resp.StatusCode == http.StatusOK
+
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Casdoor 端点 %s 返回 HTTP %d，响应片段: %s", url, resp.StatusCode, bodySnippet(body))
+	}
+
+	var probe map[string]any
+	if err := json.Unmarshal(body, &probe); err != nil {
+		return fmt.Errorf("Casdoor 端点 %s 返回的不是 JSON（疑似误指向前端页面/其他服务，而非 Casdoor API），响应片段: %s",
+			url, bodySnippet(body))
+	}
+	return nil
+}
+
+// bodySnippet 截断响应体用于错误提示
+func bodySnippet(b []byte) string {
+	s := strings.Join(strings.Fields(string(b)), " ")
+	if s == "" {
+		return "(空)"
+	}
+	if len(s) > 200 {
+		return s[:200] + "..."
+	}
+	return s
+}
+
+// Ping 探测 Casdoor 服务是否可用（用于启动等待）。
+// 除 HTTP 200 外还要求响应为 JSON，避免把「返回 HTML 的其他服务」误判为就绪。
+func Ping(endpoint string) bool {
+	return ProbeAPI(endpoint) == nil
 }
