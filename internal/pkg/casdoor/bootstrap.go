@@ -36,7 +36,7 @@ func EnsureSetup(db *sql.DB, cfg *Config) (*BootstrapResult, error) {
 	}
 
 	// 1. 读取内置应用凭据（Casdoor 首次启动会自动创建 app-built-in）
-	builtinID, builtinSecret, err := readBuiltinApp(db)
+	builtinID, builtinSecret, err := ReadBuiltinApp(db)
 	if err != nil {
 		return nil, err
 	}
@@ -68,8 +68,13 @@ func EnsureSetup(db *sql.DB, cfg *Config) (*BootstrapResult, error) {
 	}, nil
 }
 
-// readBuiltinApp 从数据库读取内置应用凭据
-func readBuiltinApp(db *sql.DB) (string, string, error) {
+// ReadBuiltinApp 从数据库读取内置应用（app-built-in）凭据。
+//
+// Casdoor 的 API 授权模型中，只有 built-in 组织的身份才是全局管理员
+// （authz.IsAllowed 中 appUser.IsGlobalAdmin() 要求 Owner=="built-in"）。
+// 因此「应用 / 组织管理」这类全局接口必须用该凭据，业务应用凭据会报
+// "Unauthorized operation" / "Please sign in first"。
+func ReadBuiltinApp(db *sql.DB) (string, string, error) {
 	var clientID, clientSecret string
 	query := `SELECT client_id, client_secret FROM casdoor_application WHERE name = 'app-built-in' LIMIT 1`
 	if err := db.QueryRow(query).Scan(&clientID, &clientSecret); err != nil {

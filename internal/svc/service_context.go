@@ -433,6 +433,16 @@ func initCasdoorClient(db *sql.DB, c config.Config) (*casdoor.Client, error) {
 		return nil, fmt.Errorf("Casdoor 应用凭据缺失：请开启 CASDOOR_AUTO_SETUP 或在配置中提供 CASDOOR_CLIENT_ID/SECRET")
 	}
 
+	// 读取内置应用（app-built-in）凭据，用于「应用 / 组织管理」等全局接口。
+	// Casdoor 权限模型中只有 built-in 身份是全局管理员，业务应用凭据会报
+	// "Unauthorized operation" / "Please sign in first"。
+	if id, secret, err := casdoor.ReadBuiltinApp(db); err != nil {
+		log.Printf("⚠️ 读取 Casdoor 内置应用凭据失败（应用/组织管理功能将不可用）: %v", err)
+	} else {
+		cfg.AdminClientId = id
+		cfg.AdminClientSecret = secret
+	}
+
 	client, err := casdoor.NewClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("创建 Casdoor 客户端失败: %w", err)

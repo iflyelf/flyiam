@@ -83,7 +83,28 @@ helmfile -f helmfile.yaml.gotmpl sync
    - 证书：`cert-built-in`
 3. **用户**：在 `flyiam` 组织下创建用户（或由数据源同步自动创建）。
 
-## 3.1 多副本与会话共享（重要）
+## 3.1 权限模型：应用 / 组织管理需内置应用凭据
+
+Casdoor 的 API 授权中，**只有 `built-in` 组织的身份是全局管理员**
+（`authz.IsAllowed` 要求 `appUser.IsGlobalAdmin()`，即 `Owner == "built-in"`）。
+FlyIAM 的常规业务请求使用业务应用凭据（`flyiam` 应用），因此：
+
+| 操作 | 业务应用凭据 | 说明 |
+|------|-------------|------|
+| 登录 / OAuth、本组织用户增删改查 | ✅ 可用 | 对象 owner 与自身组织一致 |
+| 应用列表、应用创建/修改/删除 | ❌ 报 `Unauthorized operation` | 应用 owner 为 `admin`（全局对象） |
+| 组织列表、组织创建/修改/删除 | ❌ 报 `Please sign in first` | 控制器要求全局管理员 |
+
+FlyIAM 启动时会读取内置应用 `app-built-in` 的凭据（`CASDOOR_AUTO_SETUP=true`
+创建后即为共享数据库中的 `casdoor_application` 记录），并创建一个**独立的管理客户端**，
+仅「应用 / 组织管理」接口使用它。业务接口仍用业务凭据，两者互不干扰。
+
+> 该机制无需额外配置。若日志出现
+> `⚠️ 读取 Casdoor 内置应用凭据失败（应用/组织管理功能将不可用）`，
+> 说明 `casdoor_application` 表中没有 `app-built-in`
+> （通常是 Casdoor 未初始化完成），此时应用/组织管理页面会返回明确提示。
+
+## 3.2 多副本与会话共享（重要）
 
 Casdoor 默认把登录会话保存在**本 Pod 的文件**中（`./tmp`）。内置 Casdoor 多副本
 （`CASDOOR_REPLICAS > 1`）且 Service 无会话亲和时，同一浏览器的请求可能落到另一个
@@ -143,5 +164,6 @@ Casdoor 首次启动会自动创建其全部表，无需手工执行 SQL。
 | 手机号校验失败 | 确认 `FLYIAM_CASDOOR_COUNTRY_CODE=CN`（组织默认区域影响手机号解析） |
 | 自动初始化失败 | 确认 Casdoor 已就绪且 `casdoor_application` 中存在 `app-built-in` |
 | 报 `invalid character '<' looking for beginning of value` | `CASDOOR_ENDPOINT` 指向的不是 Casdoor API（返回了 HTML，如前端页面/Ingress 首页）。用 `kubectl exec -n flyiam deploy/flyiam -- curl -sS -i "$CASDOOR_ENDPOINT/api/health" \| head` 确认应返回 JSON `{"status":"ok"}`；集群内正确值通常为 `http://casdoor:8000` |
+| 应用/组织管理页报 `Unauthorized operation` 或 `Please sign in first` | 全局对象需内置应用权限。正常由启动时自动读取 `app-built-in` 解决；若日志有「读取 Casdoor 内置应用凭据失败」，确认 `casdoor_application` 表中存在 `app-built-in` |
 | 修改了 `CASDOOR_DEFAULT_PASSWORD` 但 Casdoor 登录仍为 `123` | `123` 是 Casdoor 内置管理员 `built-in/admin` 的硬编码密码，不受配置影响；业务管理员请用 `flyiam/admin` + 配置的默认密码登录 |
 | 不知道 Casdoor 后台登录密码 | 内置管理员 `admin` / `123`（首次登录请立即修改） |

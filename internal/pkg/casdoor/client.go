@@ -21,6 +21,10 @@ type Client struct {
 	authConfig   *casdoorsdk.AuthConfig
 	organization string
 	application  string
+	// adminSDK 使用内置应用 app-built-in 凭据的独立 SDK 实例，
+	// 专用于「应用 / 组织管理」等需要全局管理员权限的接口。
+	// 使用实例客户端而非全局函数，避免与业务凭据的全局配置互相覆盖。
+	adminSDK *casdoorsdk.Client
 
 	protected   map[string]struct{}
 	protectedMu sync.RWMutex
@@ -71,6 +75,11 @@ type Config struct {
 	ClientSecret     string
 	Certificate      string
 	OrganizationName string
+	// AdminClientId/AdminClientSecret 为 Casdoor 内置应用 app-built-in 的凭据。
+	// 仅 built-in 身份具备全局管理员权限，应用/组织管理接口需用它，否则报
+	// "Unauthorized operation"（应用列表）或 "Please sign in first"（组织列表）。
+	AdminClientId     string
+	AdminClientSecret string
 	// OrganizationDisplayName 组织显示名
 	OrganizationDisplayName string
 	ApplicationName         string
@@ -118,6 +127,20 @@ func NewClient(cfg *Config) (*Client, error) {
 		cfg.ApplicationName,
 	)
 
+	// 内置应用（app-built-in）凭据：用于应用 / 组织管理等全局管理员接口。
+	// 用独立的实例客户端，不触碰全局配置，避免与业务凭据互相覆盖。
+	var adminSDK *casdoorsdk.Client
+	if cfg.AdminClientId != "" && cfg.AdminClientSecret != "" {
+		adminSDK = casdoorsdk.NewClient(
+			cfg.Endpoint,
+			cfg.AdminClientId,
+			cfg.AdminClientSecret,
+			"",
+			"built-in",
+			"app-built-in",
+		)
+	}
+
 	protected := make(map[string]struct{}, len(cfg.ProtectedUsers)+1)
 	for _, name := range cfg.ProtectedUsers {
 		if name != "" {
@@ -131,8 +154,19 @@ func NewClient(cfg *Config) (*Client, error) {
 		authConfig:   authConfig,
 		organization: cfg.OrganizationName,
 		application:  cfg.ApplicationName,
+		adminSDK:     adminSDK,
 		protected:    protected,
 	}, nil
+}
+
+// adminClient 返回具备全局管理员权限的 SDK 实例（内置应用 app-built-in）。
+// 应用 / 组织管理等全局接口必须用它，业务应用凭据会因权限不足被 Casdoor 拒绝。
+func (c *Client) adminClient() (*casdoorsdk.Client, error) {
+	if c.adminSDK == nil {
+		return nil, fmt.Errorf("Casdoor 管理凭据未就绪（未能读取内置应用 app-built-in），应用/组织管理功能不可用；" +
+			"请确认 CASDOOR_AUTO_SETUP 已开启或 Casdoor 已初始化")
+	}
+	return c.adminSDK, nil
 }
 
 // Organization 返回当前组织名
@@ -142,8 +176,15 @@ func (c *Client) Organization() string { return c.organization }
 func (c *Client) Application() string { return c.application }
 
 // ListApplications 获取全部应用
+//
+// 注意：应用（owner=admin）属于全局对象，仅内置应用凭据有权限，
+// 业务应用凭据调用会报 "Unauthorized operation"。
 func (c *Client) ListApplications() ([]*casdoorsdk.Application, error) {
-	apps, err := casdoorsdk.GetApplications()
+	sdk, err := c.adminClient()
+	if err != nil {
+		return nil, err
+	}
+	apps, err := sdk.GetApplications()
 	if err != nil {
 		return nil, fmt.Errorf("获取应用列表失败: %w", err)
 	}
@@ -152,7 +193,11 @@ func (c *Client) ListApplications() ([]*casdoorsdk.Application, error) {
 
 // GetApplication 获取单个应用
 func (c *Client) GetApplication(name string) (*casdoorsdk.Application, error) {
-	app, err := casdoorsdk.GetApplication(name)
+	sdk, err := c.adminClient()
+	if err != nil {
+		return nil, err
+	}
+	app, err := sdk.GetApplication(name)
 	if err != nil {
 		return nil, fmt.Errorf("获取应用失败: %w", err)
 	}
@@ -161,7 +206,11 @@ func (c *Client) GetApplication(name string) (*casdoorsdk.Application, error) {
 
 // AddApplication 新增应用
 func (c *Client) AddApplication(app *casdoorsdk.Application) (bool, error) {
-	ok, err := casdoorsdk.AddApplication(app)
+	sdk, err := c.adminClient()
+	if err != nil {
+		return false, err
+	}
+	ok, err := sdk.AddApplication(app)
 	if err != nil {
 		return false, fmt.Errorf("新增应用失败: %w", err)
 	}
@@ -170,7 +219,11 @@ func (c *Client) AddApplication(app *casdoorsdk.Application) (bool, error) {
 
 // UpdateApplication 更新应用
 func (c *Client) UpdateApplication(app *casdoorsdk.Application) (bool, error) {
-	ok, err := casdoorsdk.UpdateApplication(app)
+	sdk, err := c.adminClient()
+	if err != nil {
+		return false, err
+	}
+	ok, err := sdk.UpdateApplication(app)
 	if err != nil {
 		return false, fmt.Errorf("更新应用失败: %w", err)
 	}
@@ -179,8 +232,12 @@ func (c *Client) UpdateApplication(app *casdoorsdk.Application) (bool, error) {
 
 // DeleteApplication 删除应用
 func (c *Client) DeleteApplication(name string) (bool, error) {
+	sdk, err := c.adminClient()
+	if err != nil {
+		return false, err
+	}
 	app := &casdoorsdk.Application{Owner: "admin", Name: name}
-	ok, err := casdoorsdk.DeleteApplication(app)
+	ok, err := sdk.DeleteApplication(app)
 	if err != nil {
 		return false, fmt.Errorf("删除应用失败: %w", err)
 	}
@@ -194,7 +251,11 @@ func (c *Client) EnsureRedirectURI(redirectURI string) (bool, error) {
 	if !c.config.AutoRedirectURI || redirectURI == "" {
 		return false, nil
 	}
-	app, err := casdoorsdk.GetApplication(c.application)
+	sdk, err := c.adminClient()
+	if err != nil {
+		return false, err
+	}
+	app, err := sdk.GetApplication(c.application)
 	if err != nil || app == nil {
 		return false, fmt.Errorf("获取应用失败: %w", err)
 	}
@@ -204,7 +265,7 @@ func (c *Client) EnsureRedirectURI(redirectURI string) (bool, error) {
 		}
 	}
 	app.RedirectUris = append(app.RedirectUris, redirectURI)
-	if _, err := casdoorsdk.UpdateApplication(app); err != nil {
+	if _, err := sdk.UpdateApplication(app); err != nil {
 		return false, fmt.Errorf("追加回调地址失败: %w", err)
 	}
 	return true, nil
@@ -214,14 +275,20 @@ func (c *Client) EnsureRedirectURI(redirectURI string) (bool, error) {
 //
 // 说明：SDK 的 GetOrganizations 会按当前组织名作为 owner 过滤，
 // 而 Casdoor 中组织的 owner 为 admin（非当前组织名），会导致返回空列表。
-// 因此这里以应用凭据直接调用接口且不传 owner，返回全部组织。
+// 因此这里直接调用接口且不传 owner，返回全部组织。
+//
+// 权限：组织属于全局对象，且控制器要求当前身份为全局管理员，
+// 故必须使用内置应用（app-built-in）凭据，业务凭据会报 "Please sign in first"。
 func (c *Client) ListOrganizations() ([]*casdoorsdk.Organization, error) {
+	if c.config.AdminClientId == "" || c.config.AdminClientSecret == "" {
+		return nil, fmt.Errorf("Casdoor 管理凭据未就绪（未能读取内置应用 app-built-in），组织管理功能不可用")
+	}
 	endpoint := strings.TrimRight(c.config.Endpoint, "/") + "/api/get-organizations"
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("构建请求失败: %w", err)
 	}
-	req.SetBasicAuth(c.config.ClientId, c.config.ClientSecret)
+	req.SetBasicAuth(c.config.AdminClientId, c.config.AdminClientSecret)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -537,8 +604,14 @@ func (c *Client) DeleteUser(name string) (bool, error) {
 }
 
 // GetOrganizations 获取组织列表
+//
+// 注意：组织属于全局对象（owner=admin），需内置应用凭据。
 func (c *Client) GetOrganizations() ([]*casdoorsdk.Organization, error) {
-	orgs, err := casdoorsdk.GetOrganizations()
+	sdk, err := c.adminClient()
+	if err != nil {
+		return nil, err
+	}
+	orgs, err := sdk.GetOrganizations()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get organizations: %w", err)
 	}
@@ -546,7 +619,15 @@ func (c *Client) GetOrganizations() ([]*casdoorsdk.Organization, error) {
 }
 
 // GetOrganization 获取组织信息
+//
+// 优先用内置应用凭据（可读任意组织）；未就绪时回退业务凭据
+// （业务凭据可读自身组织，供启动健康检查与用户同步使用）。
 func (c *Client) GetOrganization(name string) (*casdoorsdk.Organization, error) {
+	if c.adminSDK != nil {
+		if org, err := c.adminSDK.GetOrganization(name); err == nil && org != nil {
+			return org, nil
+		}
+	}
 	org, err := casdoorsdk.GetOrganization(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get organization: %w", err)
@@ -555,8 +636,14 @@ func (c *Client) GetOrganization(name string) (*casdoorsdk.Organization, error) 
 }
 
 // AddOrganization 添加组织
+//
+// 注意：组织属于全局对象，仅内置应用凭据有权限。
 func (c *Client) AddOrganization(org *casdoorsdk.Organization) (bool, error) {
-	affected, err := casdoorsdk.AddOrganization(org)
+	sdk, err := c.adminClient()
+	if err != nil {
+		return false, err
+	}
+	affected, err := sdk.AddOrganization(org)
 	if err != nil {
 		return false, fmt.Errorf("failed to add organization: %w", err)
 	}
@@ -564,8 +651,14 @@ func (c *Client) AddOrganization(org *casdoorsdk.Organization) (bool, error) {
 }
 
 // UpdateOrganization 更新组织
+//
+// 注意：组织属于全局对象，仅内置应用凭据有权限。
 func (c *Client) UpdateOrganization(org *casdoorsdk.Organization) (bool, error) {
-	affected, err := casdoorsdk.UpdateOrganization(org)
+	sdk, err := c.adminClient()
+	if err != nil {
+		return false, err
+	}
+	affected, err := sdk.UpdateOrganization(org)
 	if err != nil {
 		return false, fmt.Errorf("failed to update organization: %w", err)
 	}
@@ -573,11 +666,17 @@ func (c *Client) UpdateOrganization(org *casdoorsdk.Organization) (bool, error) 
 }
 
 // DeleteOrganization 删除组织
+//
+// 注意：组织属于全局对象，仅内置应用凭据有权限。
 func (c *Client) DeleteOrganization(name string) (bool, error) {
+	sdk, err := c.adminClient()
+	if err != nil {
+		return false, err
+	}
 	org := &casdoorsdk.Organization{
 		Name: name,
 	}
-	affected, err := casdoorsdk.DeleteOrganization(org)
+	affected, err := sdk.DeleteOrganization(org)
 	if err != nil {
 		return false, fmt.Errorf("failed to delete organization: %w", err)
 	}
