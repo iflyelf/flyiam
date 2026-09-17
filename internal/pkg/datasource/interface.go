@@ -25,6 +25,11 @@ type User struct {
 
 	Source   string // 数据来源标识
 	Priority int    // 优先级
+
+	// Extra 自定义字段值（键为 user_field_defs.field_key），
+	// 由数据源字段映射（DataSourceConfig.FieldMapping）驱动写入，
+	// 最终作为 Casdoor User.Properties 存储。数据源字段变化只需改配置。
+	Extra map[string]string
 }
 
 // Department 标准化部门结构

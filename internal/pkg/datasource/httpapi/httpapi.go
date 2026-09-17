@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/iflyelf/flyiam/internal/pkg/datasource"
@@ -29,6 +31,9 @@ type Config struct {
 	Priority     int
 	PageSize     int
 	Auth         AuthConfig
+	// FieldMapping 外部字段名 → 内部字段键 的映射。
+	// 非空时按映射通用解析（支持自定义字段）；为空时回退内置默认字段名。
+	FieldMapping map[string]string
 }
 
 // AuthConfig 认证配置
@@ -166,6 +171,20 @@ func (h *HttpApiSource) fetchPage(ctx context.Context, page int) ([]datasource.U
 		return nil, 0, fmt.Errorf("读取响应失败: %w", err)
 	}
 
+	// 配置了字段映射：按映射通用解析（支持自定义字段，数据源变化不改代码）
+	if len(h.config.FieldMapping) > 0 {
+		var rawResp struct {
+			Count         int                      `json:"count"`
+			CurrentPageNo int                      `json:"currentPageNo"`
+			Data          []map[string]interface{} `json:"data"`
+		}
+		if err := json.Unmarshal(raw, &rawResp); err != nil {
+			return nil, 0, fmt.Errorf("解析响应失败: %w", err)
+		}
+		return convertWithMapping(rawResp.Data, h.config.FieldMapping, h.Name(), h.Priority()), rawResp.Count, nil
+	}
+
+	// 未配置映射：使用内置默认字段名（向后兼容）
 	var apiResp apiResponse
 	if err := json.Unmarshal(raw, &apiResp); err != nil {
 		return nil, 0, fmt.Errorf("解析响应失败: %w", err)
@@ -192,6 +211,76 @@ func (h *HttpApiSource) fetchPage(ctx context.Context, page int) ([]datasource.U
 		})
 	}
 	return users, apiResp.Count, nil
+}
+
+// convertWithMapping 按「外部字段名 → 内部字段键」映射解析用户。
+//
+// 内置目标键写入标准字段；其余目标键写入 Extra（自定义字段，落 Casdoor Properties）。
+func convertWithMapping(items []map[string]interface{}, mapping map[string]string, source string, priority int) []datasource.User {
+	users := make([]datasource.User, 0, len(items))
+	for _, item := range items {
+		u := datasource.User{Source: source, Priority: priority, Extra: map[string]string{}}
+		for external, internal := range mapping {
+			internal = strings.TrimSpace(internal)
+			if internal == "" {
+				continue
+			}
+			val := stringify(item[external])
+			switch internal {
+			case "domainAccount":
+				u.DomainAccount = val
+			case "employeeCode":
+				u.EmployeeCode = val
+			case "name":
+				u.Name = val
+			case "phone":
+				u.Phone = val
+			case "workEmail", "email":
+				u.WorkEmail = val
+			case "compileType":
+				u.CompileType = val
+			case "superiorAccount", "superior":
+				u.SuperiorAccount = val
+			case "deptIdLv0":
+				u.DeptIDLv0 = val
+			case "deptIdLv1":
+				u.DeptIDLv1 = val
+			case "deptIdLv2":
+				u.DeptIDLv2 = val
+			case "deptNameLv0":
+				u.DeptNameLv0 = val
+			case "deptNameLv1":
+				u.DeptNameLv1 = val
+			case "deptNameLv2":
+				u.DeptNameLv2 = val
+			default:
+				u.Extra[internal] = val
+			}
+		}
+		users = append(users, u)
+	}
+	return users
+}
+
+// stringify 将 JSON 值转为字符串（兼容字符串/数字/布尔）
+func stringify(v interface{}) string {
+	switch t := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return t
+	case float64:
+		// JSON 数字：整数不带小数点
+		if t == float64(int64(t)) {
+			return strconv.FormatInt(int64(t), 10)
+		}
+		return strconv.FormatFloat(t, 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(t)
+	default:
+		b, _ := json.Marshal(t)
+		return string(b)
+	}
 }
 
 // GetDepartments 从用户数据中提取部门

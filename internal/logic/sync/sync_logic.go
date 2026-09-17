@@ -176,26 +176,34 @@ func (l *SyncLogic) SyncFromDataSources(ctx context.Context, opts SyncOptions, t
 	return nil
 }
 
-// toSyncUser 数据源用户转 Casdoor 同步结构（人事字段写入属性）
+// toSyncUser 数据源用户转 Casdoor 同步结构（人事字段 + 自定义字段写入属性）
 func toSyncUser(u datasource.User) casdoor.SyncUser {
+	props := map[string]string{
+		"empCode":     u.EmployeeCode,
+		"compileType": u.CompileType,
+		"deptNameLv0": u.DeptNameLv0,
+		"deptNameLv1": u.DeptNameLv1,
+		"deptNameLv2": u.DeptNameLv2,
+		"deptIdLv0":   u.DeptIDLv0,
+		"deptIdLv1":   u.DeptIDLv1,
+		"deptIdLv2":   u.DeptIDLv2,
+		"superior":    u.SuperiorAccount,
+		"source":      u.Source,
+	}
+	// 合并数据源字段映射得到的自定义字段（数据源变化只需改配置）
+	for k, v := range u.Extra {
+		if k == "" {
+			continue
+		}
+		props[k] = v
+	}
 	return casdoor.SyncUser{
 		DomainAccount: u.DomainAccount,
 		Name:          u.Name,
 		Email:         u.WorkEmail,
 		Phone:         u.Phone,
 		Affiliation:   u.DeptNameLv1,
-		Properties: map[string]string{
-			"empCode":     u.EmployeeCode,
-			"compileType": u.CompileType,
-			"deptNameLv0": u.DeptNameLv0,
-			"deptNameLv1": u.DeptNameLv1,
-			"deptNameLv2": u.DeptNameLv2,
-			"deptIdLv0":   u.DeptIDLv0,
-			"deptIdLv1":   u.DeptIDLv1,
-			"deptIdLv2":   u.DeptIDLv2,
-			"superior":    u.SuperiorAccount,
-			"source":      u.Source,
-		},
+		Properties:    props,
 	}
 }
 

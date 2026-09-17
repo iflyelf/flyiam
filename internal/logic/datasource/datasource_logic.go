@@ -2,7 +2,9 @@ package datasource
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/iflyelf/flyiam/internal/model"
 	pkgds "github.com/iflyelf/flyiam/internal/pkg/datasource"
@@ -45,15 +47,15 @@ func (l *Logic) Create(ctx context.Context, cfg *model.DataSourceConfig) (int64,
 	query := `
 		INSERT INTO datasource_configs (
 			name, type, enabled, url, method, auth_type, auth_token, auth_username, auth_password,
-			timeout, sync_interval, auto_sync, priority, page_size, remark, created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW(),NOW())
+			timeout, sync_interval, auto_sync, priority, page_size, field_mapping, remark, created_at, updated_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),NOW())
 		RETURNING id
 	`
 	var id int64
 	err := l.db.QueryRowCtx(ctx, &id, query,
 		cfg.Name, cfg.Type, cfg.Enabled, cfg.URL, cfg.Method, cfg.AuthType, cfg.AuthToken,
 		cfg.AuthUsername, cfg.AuthPassword, cfg.Timeout, cfg.SyncInterval, cfg.AutoSync,
-		cfg.Priority, cfg.PageSize, cfg.Remark,
+		cfg.Priority, cfg.PageSize, cfg.FieldMapping, cfg.Remark,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("创建数据源失败: %w", err)
@@ -67,13 +69,13 @@ func (l *Logic) Update(ctx context.Context, cfg *model.DataSourceConfig) error {
 		UPDATE datasource_configs SET
 			name=$1, type=$2, enabled=$3, url=$4, method=$5, auth_type=$6, auth_token=$7,
 			auth_username=$8, auth_password=$9, timeout=$10, sync_interval=$11, auto_sync=$12,
-			priority=$13, page_size=$14, remark=$15, updated_at=NOW()
-		WHERE id=$16
+			priority=$13, page_size=$14, field_mapping=$15, remark=$16, updated_at=NOW()
+		WHERE id=$17
 	`
 	_, err := l.db.ExecCtx(ctx, query,
 		cfg.Name, cfg.Type, cfg.Enabled, cfg.URL, cfg.Method, cfg.AuthType, cfg.AuthToken,
 		cfg.AuthUsername, cfg.AuthPassword, cfg.Timeout, cfg.SyncInterval, cfg.AutoSync,
-		cfg.Priority, cfg.PageSize, cfg.Remark, cfg.ID,
+		cfg.Priority, cfg.PageSize, cfg.FieldMapping, cfg.Remark, cfg.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("更新数据源失败: %w", err)
@@ -134,6 +136,7 @@ func buildSource(c model.DataSourceConfig) (pkgds.DataSource, error) {
 			SyncInterval: c.SyncInterval,
 			Priority:     c.Priority,
 			PageSize:     c.PageSize,
+			FieldMapping: parseFieldMapping(c.FieldMapping),
 			Auth: httpapi.AuthConfig{
 				Type:     c.AuthType,
 				Token:    c.AuthToken,
@@ -144,4 +147,17 @@ func buildSource(c model.DataSourceConfig) (pkgds.DataSource, error) {
 	default:
 		return nil, fmt.Errorf("不支持的数据源类型: %s", c.Type)
 	}
+}
+
+// parseFieldMapping 解析字段映射（JSON 对象字符串）。非法或为空时返回 nil，走内置默认字段名。
+func parseFieldMapping(raw string) map[string]string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	m := map[string]string{}
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		return nil
+	}
+	return m
 }

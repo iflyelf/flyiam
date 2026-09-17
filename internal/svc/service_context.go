@@ -353,11 +353,14 @@ func createDataSourceConfigsTable(db *sql.DB) error {
 		auto_sync BOOLEAN NOT NULL DEFAULT TRUE,
 		priority INT NOT NULL DEFAULT 90,
 		page_size INT NOT NULL DEFAULT 1000,
+		field_mapping TEXT DEFAULT '',
 		remark VARCHAR(255),
 		created_at TIMESTAMPTZ DEFAULT NOW(),
 		updated_at TIMESTAMPTZ DEFAULT NOW()
 	);
 	CREATE INDEX IF NOT EXISTS idx_datasource_configs_enabled ON datasource_configs(enabled);
+	-- 兼容旧表：补齐字段映射列（数据源字段变化无需改代码）
+	ALTER TABLE datasource_configs ADD COLUMN IF NOT EXISTS field_mapping TEXT DEFAULT '';
 	`
 	_, err := db.Exec(schema)
 	return err

@@ -127,6 +127,31 @@
         <el-form-item label="优先级">
           <el-input-number v-model="form.priority" :min="0" :max="1000" />
         </el-form-item>
+        <el-form-item label="字段映射">
+          <div class="mapping-editor">
+            <div class="mapping-hint">
+              外部字段名 → 内部字段键；留空则使用内置默认字段名（DOMACT/NAME/...）。数据源字段变化只需改此处，无需改代码。
+            </div>
+            <div v-for="(m, idx) in mappingRows" :key="idx" class="mapping-row">
+              <el-input v-model="m.external" placeholder="外部字段名，如 DOMACT" style="width: 200px" />
+              <span class="arrow">→</span>
+              <el-select
+                v-model="m.internal"
+                filterable
+                allow-create
+                default-first-option
+                placeholder="内部字段键"
+                style="width: 220px"
+              >
+                <el-option v-for="k in internalKeyOptions" :key="k.value" :label="k.label" :value="k.value" />
+              </el-select>
+              <el-button link type="danger" :icon="Delete" @click="mappingRows.splice(idx, 1)" />
+            </div>
+            <el-button link type="primary" :icon="Plus" @click="mappingRows.push({ external: '', internal: '' })">
+              添加映射
+            </el-button>
+          </div>
+        </el-form-item>
         <el-form-item label="启用">
           <el-switch v-model="form.enabled" />
         </el-form-item>
@@ -158,7 +183,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Download, Loading } from '@element-plus/icons-vue'
+import { Plus, Refresh, Download, Loading, Delete } from '@element-plus/icons-vue'
+import { listUserFields } from '@/api/userField'
 import {
   listDataSources,
   createDataSource,
@@ -202,6 +228,68 @@ const emptyForm = () => ({
 })
 const form = ref(emptyForm())
 
+// 字段映射编辑（外部字段名 → 内部字段键）
+const mappingRows = ref([])
+const userFields = ref([])
+
+// 内置字段键（与后端 convertWithMapping 的标准字段一致）
+const builtinKeys = [
+  { value: 'domainAccount', label: '域账号（唯一标识，必填）' },
+  { value: 'name', label: '姓名' },
+  { value: 'employeeCode', label: '工号' },
+  { value: 'workEmail', label: '邮箱' },
+  { value: 'phone', label: '手机号' },
+  { value: 'compileType', label: '编制类型' },
+  { value: 'superiorAccount', label: '上级账号' },
+  { value: 'deptNameLv0', label: '零级部门' },
+  { value: 'deptNameLv1', label: '一级部门' },
+  { value: 'deptNameLv2', label: '二级部门' },
+  { value: 'deptIdLv0', label: '零级部门ID' },
+  { value: 'deptIdLv1', label: '一级部门ID' },
+  { value: 'deptIdLv2', label: '二级部门ID' }
+]
+
+const internalKeyOptions = computed(() => {
+  const opts = [...builtinKeys]
+  for (const f of userFields.value) {
+    if (!opts.some((o) => o.value === f.fieldKey)) {
+      opts.push({ value: f.fieldKey, label: `${f.label}（自定义：${f.fieldKey}）` })
+    }
+  }
+  return opts
+})
+
+const loadUserFields = async () => {
+  try {
+    const res = await listUserFields()
+    userFields.value = res.data || []
+  } catch (e) {
+    userFields.value = []
+  }
+}
+
+// parseMapping 解析 fieldMapping JSON 字符串为编辑行
+const parseMapping = (raw) => {
+  if (!raw) return []
+  try {
+    const obj = JSON.parse(raw)
+    return Object.keys(obj).map((k) => ({ external: k, internal: obj[k] }))
+  } catch (e) {
+    return []
+  }
+}
+
+// buildMapping 将编辑行组装为 JSON 字符串
+const buildMapping = () => {
+  const obj = {}
+  for (const r of mappingRows.value) {
+    const ext = (r.external || '').trim()
+    const internal = (r.internal || '').trim()
+    if (ext && internal) obj[ext] = internal
+  }
+  return Object.keys(obj).length ? JSON.stringify(obj) : ''
+}
+
 const loadDataSources = async () => {
   loading.value = true
   try {
@@ -229,11 +317,13 @@ const loadProgress = async () => {
 
 const openCreate = () => {
   form.value = emptyForm()
+  mappingRows.value = []
   dialogVisible.value = true
 }
 
 const openEdit = (row) => {
   form.value = { ...emptyForm(), ...row }
+  mappingRows.value = parseMapping(row.fieldMapping)
   dialogVisible.value = true
 }
 
@@ -242,6 +332,7 @@ const handleSave = async () => {
     ElMessage.warning('请填写名称与接口地址')
     return
   }
+  form.value.fieldMapping = buildMapping()
   saving.value = true
   try {
     if (form.value.id) {
@@ -341,6 +432,7 @@ const progressPercent = computed(() => {
 
 onMounted(async () => {
   loadDataSources()
+  loadUserFields()
   await loadProgress()
   // 若已有任务在运行（如定时触发或其他入口触发），自动开始轮询
   if (anyRunning.value) startPolling()
@@ -350,6 +442,25 @@ onUnmounted(stopPolling)
 </script>
 
 <style scoped>
+.mapping-editor {
+  width: 100%;
+}
+.mapping-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+.mapping-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.mapping-row .arrow {
+  color: var(--text-secondary);
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
