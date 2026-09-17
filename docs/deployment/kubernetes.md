@@ -86,7 +86,7 @@ affinity:
               operator: In
               values:
                 - linux
-  podAntiAffinity:                 # 硬性打散：同一 release 的 Pod 不共节点
+  podAntiAffinity:                 # 硬性打散：同组件副本不共节点
     requiredDuringSchedulingIgnoredDuringExecution:
       - labelSelector:
           matchExpressions:
@@ -94,6 +94,10 @@ affinity:
               operator: In
               values:
                 - flyiam
+            - key: app.kubernetes.io/component
+              operator: In
+              values:
+                - server
         topologyKey: kubernetes.io/hostname
 ```
 
@@ -105,8 +109,8 @@ export FLYIAM_NODE_LABEL_VALUE="true"
 ```
 
 > **硬性调度**：不满足时 Pod 会一直 `Pending`，用 `kubectl describe pod` 查看调度事件。
-> 打散为硬性（`required`），**带 `flyiam=true` 标签的节点数需 ≥ 4**
-> （应用 2 副本 + 内置 Casdoor 2 副本，共用 `app.kubernetes.io/name=flyiam` 标签互相排斥）。
+> 反亲和按组件隔离（应用 `server`、Casdoor `casdoor`），两者**可同节点**，
+> 因此**带 `flyiam=true` 标签的节点数需 ≥ max(应用副本数, Casdoor 副本数)**。
 > 节点不足时下调 `FLYIAM_REPLICAS` / `CASDOOR_REPLICAS`。
 
 ## 4. 内置 Casdoor 说明
