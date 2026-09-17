@@ -17,6 +17,11 @@ Helmfile
 数据库（PostgreSQL）与缓存（Redis）为**外置依赖**，Chart 不部署。
 Chart 仅暴露 ClusterIP Service，不包含 Ingress；域名访问请在集群入口层（Ingress Controller / Gateway）统一配置。
 
+> **Service 选择器（重要）**：应用与内置 Casdoor 的 Pod 都带 `app.kubernetes.io/name=flyiam`，
+> 两个 Service 靠 `app.kubernetes.io/component` 区分：
+> 应用 `component=server`（`flyiam:8081`）、Casdoor `component=casdoor`（`casdoor:8000`）。
+> 网关应将应用域名指向 `flyiam:8081`、SSO 域名指向 `casdoor:8000`，不要指向同一个 Service。
+
 ## 2. 前置条件
 
 - Kubernetes 1.24+

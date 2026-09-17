@@ -17,5 +17,9 @@ spec:
       {{- if and (eq .Values.service.type "NodePort") .Values.service.nodePort }}
       nodePort: {{ .Values.service.nodePort }}
       {{- end }}
+  # 必须限定 component=server：内置 Casdoor 的 Pod 同样带有
+  # app.kubernetes.io/name=flyiam + instance 标签，若不限定会把 Casdoor
+  # 也选进本 Service 的 Endpoints，导致访问本应用时随机跳到 Casdoor 页面。
   selector:
     {{- include "flyiam.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: server

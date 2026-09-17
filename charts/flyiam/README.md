@@ -117,6 +117,14 @@ charts/flyiam/
 
 > Chart 仅暴露 ClusterIP Service，不包含 Ingress；域名/HTTPS 请在集群入口层（Ingress Controller / Gateway）统一配置。
 
+> **Service 选择器（重要）**：应用与内置 Casdoor 的 Pod 都带有 `app.kubernetes.io/name=flyiam`，
+> 因此两个 Service 必须用 `app.kubernetes.io/component` 区分：
+> 应用 Service 选 `component=server`（`flyiam:8081`），Casdoor Service 选 `component=casdoor`（`casdoor:8000`）。
+> 若应用 Service 遗漏该条件，Casdoor 会被选入同一 Endpoints，访问应用域名时会随机跳到 Casdoor 页面。
+>
+> ⚠️ 从旧版本升级时，运行中的旧 Pod 还没有 `component=server` 标签，
+> 需等新 Pod 滚动就绪后才会加入 Endpoints（期间可能短暂无端点）。
+
 ### 外置域名访问 Casdoor
 
 集群入口以域名暴露 Casdoor 时，`FLYIAM_CASDOOR_PUBLIC_ENDPOINT` 填写域名即可，
