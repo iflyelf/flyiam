@@ -180,7 +180,7 @@ releases:
               exit 1
             fi
             if [ "$SESSION_ENABLED" = "true" ]; then
-              echo "ℹ️  Casdoor 会话存储: Redis ({{ .Values.casdoorRedisHost }}:{{ .Values.casdoorRedisPort }} db={{ .Values.casdoorRedisDb }})"
+              echo "ℹ️  Casdoor 会话存储: Redis ({{ .Values.redisHost }}:{{ .Values.redisPort }} db={{ .Values.casdoorRedisDb }})"
             fi
             
             echo "✅ 前置条件检查通过"

@@ -99,14 +99,13 @@ Unauthorized operation
 | 变量 | 说明 | 默认 |
 |------|------|------|
 | `CASDOOR_REDIS_SESSION_ENABLED` | 是否用 Redis 共享会话 | 跟随 `FLYIAM_REDIS_ENABLED`（默认 `true`） |
-| `CASDOOR_REDIS_HOST` | 会话 Redis 地址（默认复用 `FLYIAM_REDIS_HOST`） | `redis.default.svc.cluster.local` |
-| `CASDOOR_REDIS_PORT` | 会话 Redis 端口（默认复用 `FLYIAM_REDIS_PORT`） | `6379` |
 | `CASDOOR_REDIS_DB` | 会话 Redis 数据库编号 | `1` |
-| `CASDOOR_REDIS_POOL_SIZE` | 连接池大小 | `1000` |
 
-> 会话 Redis **密码复用 Secret 中的 `REDIS_PASSWORD`**（与 `FLYIAM_REDIS_PASSWORD` 一致），
-> 由 initContainer 注入，不在 ConfigMap 中明文保存。
+> **地址、端口、密码直接复用 FlyIAM 的 Redis 配置**（`FLYIAM_REDIS_HOST` /
+> `FLYIAM_REDIS_PORT` / `FLYIAM_REDIS_PASSWORD`），无需重复配置；
+> 密码由 initContainer 从 Secret 的 `REDIS_PASSWORD` 注入，不在 ConfigMap 中明文保存。
 > 使用 `existingSecret` 时需确保其包含 `REDIS_PASSWORD`。
+> 仅数据库编号 `CASDOOR_REDIS_DB` 需要单独设置（与缓存 DB 分开，避免键冲突）。
 
 > ⚠️ 关闭 `CASDOOR_REDIS_SESSION_ENABLED` 时，必须将 `CASDOOR_REPLICAS` 设为 `1`，
 > 否则 `helmfile sync` 会在前置检查阶段直接报错并终止（避免部署后登录异常）。

@@ -34,7 +34,7 @@ data:
     # 请求会落到另一个 Pod 导致读不到会话（表现为 "Unauthorized operation"）。
     # 配置 redisEndpoint 后所有副本共享会话（各副本需能访问同一 Redis）。
     {{- if .Values.casdoor.redisSession.enabled }}
-    redisEndpoint = {{ .Values.casdoor.redisSession.host }}:{{ .Values.casdoor.redisSession.port }},{{ .Values.casdoor.redisSession.poolSize }},__REDIS_PASSWORD__,{{ .Values.casdoor.redisSession.db }}
+    redisEndpoint = {{ .Values.casdoor.redisSession.host }}:{{ .Values.casdoor.redisSession.port }},1000,__REDIS_PASSWORD__,{{ .Values.casdoor.redisSession.db }}
     {{- end }}
 
     # 静态资源

@@ -107,8 +107,7 @@ charts/flyiam/
 | `CASDOOR_ENABLED` | 部署内置 Casdoor | `true` |
 | `CASDOOR_REPLICAS` | Casdoor 副本数 | `2` |
 | `CASDOOR_REDIS_SESSION_ENABLED` | Casdoor 会话是否用 Redis 共享（多副本必须开启） | 跟随 `FLYIAM_REDIS_ENABLED`（默认 `true`） |
-| `CASDOOR_REDIS_HOST` / `CASDOOR_REDIS_PORT` | Casdoor 会话 Redis（默认复用 `FLYIAM_REDIS_*`，密码复用 Secret `REDIS_PASSWORD`） | 同 `FLYIAM_REDIS_*` |
-| `CASDOOR_REDIS_DB` | Casdoor 会话 Redis 数据库编号 | `1` |
+| `CASDOOR_REDIS_DB` | Casdoor 会话 Redis 数据库编号（地址/端口/密码复用 `FLYIAM_REDIS_*`） | `1` |
 | `CASDOOR_IMAGE_TAG` | Casdoor 镜像标签 | `latest` |
 | `CASDOOR_IMAGE_PULL_POLICY` | Casdoor 镜像拉取策略 | `Always` |
 | `CASDOOR_INIT_IMAGE_TAG` | Casdoor initContainer 镜像标签（生成 app.conf） | `1.36` |

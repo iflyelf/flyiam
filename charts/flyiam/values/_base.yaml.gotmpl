@@ -109,13 +109,10 @@ casdoorReplicas: {{ env "CASDOOR_REPLICAS" | default "2" }}
 # 多副本 + Service 无亲和时会出现「Unauthorized operation」（请求落到另一 Pod 读不到会话）。
 # 启用后写入 app.conf 的 redisEndpoint，所有副本共享会话。
 # 默认跟随 FLYIAM_REDIS_ENABLED（无 Redis 时不启用，避免连接不存在的实例）。
+# 地址/端口/密码复用上方 FLYIAM_REDIS_*（密码走 Secret，由 initContainer 注入，不落明文），
+# 仅会话 DB 需与 FlyIAM 缓存 DB 分开，避免键冲突。
 casdoorRedisSessionEnabled: {{ env "CASDOOR_REDIS_SESSION_ENABLED" | default (env "FLYIAM_REDIS_ENABLED" | default "true") }}
-# Redis 连接参数（默认复用上方 FLYIAM_REDIS_*；会话 DB 默认独立为 1，避免与缓存键冲突）
-# 密码复用 Secret 中的 REDIS_PASSWORD，由 initContainer 注入，不落 ConfigMap 明文
-casdoorRedisHost: '{{ env "CASDOOR_REDIS_HOST" | default (env "FLYIAM_REDIS_HOST" | default "redis.default.svc.cluster.local") }}'
-casdoorRedisPort: {{ env "CASDOOR_REDIS_PORT" | default (env "FLYIAM_REDIS_PORT" | default "6379") }}
 casdoorRedisDb: {{ env "CASDOOR_REDIS_DB" | default "1" }}
-casdoorRedisPoolSize: {{ env "CASDOOR_REDIS_POOL_SIZE" | default "1000" }}
 # Service 与端口
 casdoorServiceName: '{{ env "CASDOOR_SERVICE_NAME" | default "casdoor" }}'
 casdoorServicePort: {{ env "CASDOOR_SERVICE_PORT" | default "8000" }}
