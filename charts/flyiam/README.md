@@ -79,6 +79,10 @@ charts/flyiam/
 > **≥ 应用副本数 + Casdoor 副本数**（prod 为 `3 + 2 = 5`）。
 > 启用 HPA 时上限同样受节点数限制（`maxReplicas` 过大将出现 Pending）。
 
+> ⚠️ Casdoor 多副本**必须共享会话**（默认已开启 Redis 会话，会话 DB 为 `1`），
+> 否则登录会出现 `Unauthorized operation`。关闭 `CASDOOR_REDIS_SESSION_ENABLED`
+> 时 `CASDOOR_REPLICAS` 必须为 `1`（前置检查会强制校验）。
+
 ## 关键配置
 
 `values/_base.yaml.gotmpl` 集中管理（全部支持环境变量覆盖）：
@@ -102,6 +106,9 @@ charts/flyiam/
 | `FLYIAM_CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码 | `ysyh!9Sky` |
 | `CASDOOR_ENABLED` | 部署内置 Casdoor | `true` |
 | `CASDOOR_REPLICAS` | Casdoor 副本数 | `2` |
+| `CASDOOR_REDIS_SESSION_ENABLED` | Casdoor 会话是否用 Redis 共享（多副本必须开启） | 跟随 `FLYIAM_REDIS_ENABLED`（默认 `true`） |
+| `CASDOOR_REDIS_HOST` / `CASDOOR_REDIS_PORT` | Casdoor 会话 Redis（默认复用 `FLYIAM_REDIS_*`，密码复用 Secret `REDIS_PASSWORD`） | 同 `FLYIAM_REDIS_*` |
+| `CASDOOR_REDIS_DB` | Casdoor 会话 Redis 数据库编号 | `1` |
 | `CASDOOR_IMAGE_TAG` | Casdoor 镜像标签 | `latest` |
 | `CASDOOR_IMAGE_PULL_POLICY` | Casdoor 镜像拉取策略 | `Always` |
 | `CASDOOR_INIT_IMAGE_TAG` | Casdoor initContainer 镜像标签（生成 app.conf） | `1.36` |

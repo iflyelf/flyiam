@@ -170,6 +170,19 @@ releases:
               echo "ℹ️  已开启 Casdoor 自动初始化，跳过应用凭据检查"
             fi
             
+            # 检查 Casdoor 会话共享：多副本必须共享会话，否则登录会出现
+            # "Unauthorized operation"（请求落到另一 Pod 读不到本 Pod 文件会话）。
+            CASDOOR_REPLICAS="{{ .Values.casdoorReplicas }}"
+            SESSION_ENABLED="{{ .Values.casdoorRedisSessionEnabled }}"
+            if [ "$CASDOOR_REPLICAS" != "1" ] && [ "$SESSION_ENABLED" != "true" ]; then
+              echo "❌ 错误: Casdoor 副本数为 $CASDOOR_REPLICAS 时必须启用共享会话"
+              echo "         请设置 CASDOOR_REDIS_SESSION_ENABLED=true，或将 CASDOOR_REPLICAS 设为 1"
+              exit 1
+            fi
+            if [ "$SESSION_ENABLED" = "true" ]; then
+              echo "ℹ️  Casdoor 会话存储: Redis ({{ .Values.casdoorRedisHost }}:{{ .Values.casdoorRedisPort }} db={{ .Values.casdoorRedisDb }})"
+            fi
+            
             echo "✅ 前置条件检查通过"
       
       - events: ["postsync"]

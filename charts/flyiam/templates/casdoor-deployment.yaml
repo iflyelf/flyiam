@@ -43,7 +43,9 @@ spec:
             - -c
             - |
               set -e
-              sed "s|__DB_PASSWORD__|${DB_PASSWORD}|g" /config-template/app.conf.tpl > /conf/app.conf
+              sed -e "s|__DB_PASSWORD__|${DB_PASSWORD}|g" \
+                  -e "s|__REDIS_PASSWORD__|${REDIS_PASSWORD}|g" \
+                  /config-template/app.conf.tpl > /conf/app.conf
               echo "✅ Casdoor app.conf 已生成"
           env:
             - name: DB_PASSWORD
@@ -55,6 +57,17 @@ spec:
                   name: {{ include "flyiam.fullname" . }}-secret
                   {{- end }}
                   key: DB_PASSWORD
+            {{- if .Values.casdoor.redisSession.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.existingSecret }}
+                  name: {{ .Values.existingSecret }}
+                  {{- else }}
+                  name: {{ include "flyiam.fullname" . }}-secret
+                  {{- end }}
+                  key: REDIS_PASSWORD
+            {{- end }}
           volumeMounts:
             - name: casdoor-config-template
               mountPath: /config-template

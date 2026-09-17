@@ -119,7 +119,13 @@ export FLYIAM_NODE_LABEL_VALUE="true"
 | 端口 | `8000` | `CASDOOR_SERVICE_PORT` |
 | 时区 | `Asia/Shanghai` | `CASDOOR_TIMEZONE` |
 | 运行模式 | `prod` | `CASDOOR_RUN_MODE` |
+| 会话存储 | Redis 共享（DB `1`） | `CASDOOR_REDIS_SESSION_ENABLED` / `CASDOOR_REDIS_DB` |
 | 是否部署 | `true` | `CASDOOR_ENABLED` |
+
+> **多副本会话（重要）**：Casdoor 默认用「本 Pod 文件」保存登录会话，多副本且
+> Service 无会话亲和时会因请求落到其他 Pod 而报 `Unauthorized operation`。
+> Chart 默认开启 Redis 共享会话（复用 `FLYIAM_REDIS_*`）。
+> 若关闭该开关，则 `CASDOOR_REPLICAS` 必须为 `1`，否则 `helmfile sync` 前置检查会报错终止。
 
 > **关于 `/swagger` 404**：Casdoor 仅在 `runmode = dev` 时注册 `/swagger` 静态路由，
 > 因此默认 `CASDOOR_RUN_MODE=prod` 下访问 `/swagger` 返回 404 属正常现象。
@@ -149,6 +155,8 @@ Casdoor 与 FlyIAM **共用同一数据库**（表前缀 `casdoor_`），
 | `FLYIAM_IMAGE_PULL_POLICY` | 应用镜像拉取策略 | `Always` |
 | `CASDOOR_IMAGE_PULL_POLICY` | Casdoor 镜像拉取策略 | `Always` |
 | `CASDOOR_INIT_IMAGE_TAG` | Casdoor initContainer 镜像标签 | `1.36` |
+| `CASDOOR_REDIS_SESSION_ENABLED` | Casdoor 会话 Redis 共享（多副本必开） | 跟随 `FLYIAM_REDIS_ENABLED` |
+| `CASDOOR_REDIS_DB` | Casdoor 会话 Redis 数据库编号 | `1` |
 | `FLYIAM_NODE_LABEL` / `FLYIAM_NODE_LABEL_VALUE` | 硬性节点亲和性标签 | `flyiam` / `true` |
 | `FLYIAM_DB_HOST` | 数据库地址 | `postgres.default.svc.cluster.local` |
 | `FLYIAM_DB_PASSWORD` | 数据库密码 | - |

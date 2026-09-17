@@ -332,6 +332,14 @@ casdoor:
   timezone: {{ .Values.casdoorTimezone | quote }}
   staticBaseUrl: {{ .Values.casdoorStaticBaseUrl | quote }}
   runMode: {{ .Values.casdoorRunMode | quote }}
+  # 会话存储（多副本必须共享，写入 app.conf 的 redisEndpoint）
+  # 密码占位符 __REDIS_PASSWORD__ 由 initContainer 从 Secret 注入
+  redisSession:
+    enabled: {{ .Values.casdoorRedisSessionEnabled }}
+    host: {{ .Values.casdoorRedisHost | quote }}
+    port: {{ .Values.casdoorRedisPort }}
+    db: {{ .Values.casdoorRedisDb }}
+    poolSize: {{ .Values.casdoorRedisPoolSize }}
   # 自动初始化（组织 / 应用 / 管理员）
   autoSetup: {{ .Values.casdoorAutoSetup }}
   autoRedirectUri: {{ .Values.casdoorAutoRedirectUri }}

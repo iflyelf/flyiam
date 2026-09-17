@@ -3,9 +3,9 @@
 # Casdoor 配置模板（app.conf）
 #
 # 说明：
-#   - 此 ConfigMap 保存带占位符 __DB_PASSWORD__ 的模板；
+#   - 此 ConfigMap 保存带占位符 __DB_PASSWORD__ / __REDIS_PASSWORD__ 的模板；
 #   - 由 Deployment 的 initContainer 读取后替换占位符并写入共享卷，
-#     避免在 ConfigMap 中明文保存数据库密码。
+#     避免在 ConfigMap 中明文保存数据库/Redis 密码。
 #   - 关键配置：中文语言、上海时区、与 FlyIAM 共用数据库（表前缀 casdoor_）。
 # =============================================================================
 apiVersion: v1
@@ -30,7 +30,12 @@ data:
     tableNamePrefix = {{ .Values.casdoor.database.tablePrefix }}
 
     # 会话
-    sessionConfig = {"cookieName":"casdoor_session_id","gclifetime":3600,"enableSetCookie":true,"cookieLifeTime":3600,"providerConfig":"/tmp"}
+    # Casdoor 默认用「本 Pod 文件」保存会话；多副本且 Service 无会话亲和时，
+    # 请求会落到另一个 Pod 导致读不到会话（表现为 "Unauthorized operation"）。
+    # 配置 redisEndpoint 后所有副本共享会话（各副本需能访问同一 Redis）。
+    {{- if .Values.casdoor.redisSession.enabled }}
+    redisEndpoint = {{ .Values.casdoor.redisSession.host }}:{{ .Values.casdoor.redisSession.port }},{{ .Values.casdoor.redisSession.poolSize }},__REDIS_PASSWORD__,{{ .Values.casdoor.redisSession.db }}
+    {{- end }}
 
     # 静态资源
     staticBaseUrl = "{{ .Values.casdoor.staticBaseUrl }}"

@@ -83,6 +83,34 @@ helmfile -f helmfile.yaml.gotmpl sync
    - 证书：`cert-built-in`
 3. **用户**：在 `flyiam` 组织下创建用户（或由数据源同步自动创建）。
 
+## 3.1 多副本与会话共享（重要）
+
+Casdoor 默认把登录会话保存在**本 Pod 的文件**中（`./tmp`）。内置 Casdoor 多副本
+（`CASDOOR_REPLICAS > 1`）且 Service 无会话亲和时，同一浏览器的请求可能落到另一个
+Pod，读不到会话即被当作匿名，表现为：
+
+```
+Unauthorized operation
+```
+
+因此 Chart 默认开启 **Redis 共享会话**：把 `redisEndpoint` 写入 `app.conf`，所有副本
+共享同一份会话（复用外置 Redis，会话 DB 默认独立为 `1`，避免与 FlyIAM 缓存键冲突）。
+
+| 变量 | 说明 | 默认 |
+|------|------|------|
+| `CASDOOR_REDIS_SESSION_ENABLED` | 是否用 Redis 共享会话 | 跟随 `FLYIAM_REDIS_ENABLED`（默认 `true`） |
+| `CASDOOR_REDIS_HOST` | 会话 Redis 地址（默认复用 `FLYIAM_REDIS_HOST`） | `redis.default.svc.cluster.local` |
+| `CASDOOR_REDIS_PORT` | 会话 Redis 端口（默认复用 `FLYIAM_REDIS_PORT`） | `6379` |
+| `CASDOOR_REDIS_DB` | 会话 Redis 数据库编号 | `1` |
+| `CASDOOR_REDIS_POOL_SIZE` | 连接池大小 | `1000` |
+
+> 会话 Redis **密码复用 Secret 中的 `REDIS_PASSWORD`**（与 `FLYIAM_REDIS_PASSWORD` 一致），
+> 由 initContainer 注入，不在 ConfigMap 中明文保存。
+> 使用 `existingSecret` 时需确保其包含 `REDIS_PASSWORD`。
+
+> ⚠️ 关闭 `CASDOOR_REDIS_SESSION_ENABLED` 时，必须将 `CASDOOR_REPLICAS` 设为 `1`，
+> 否则 `helmfile sync` 会在前置检查阶段直接报错并终止（避免部署后登录异常）。
+
 ## 4. 关键配置项
 
 | 配置 | 环境变量 | 默认 |
@@ -112,6 +140,7 @@ Casdoor 首次启动会自动创建其全部表，无需手工执行 SQL。
 | `Redirect URI ... doesn't exist` | 开启自动追加回调（`CASDOOR_AUTO_REDIRECT_URI=true`）或手工加入白名单 |
 | 浏览器跳转 `localhost:8000` 打不开 | 设置 `FLYIAM_CASDOOR_PUBLIC_ENDPOINT` 为浏览器可达的外置域名（标准端口 80/443） |
 | 登录后回到登录页 | 查看 FlyIAM 日志中 `/api/auth/callback` 报错 |
+| 登录时报 `Unauthorized operation` | Casdoor 多副本会话不共享：确认 `CASDOOR_REDIS_SESSION_ENABLED=true` 且各副本可访问同一 Redis；或将 `CASDOOR_REPLICAS` 设为 `1` |
 | 手机号校验失败 | 确认 `FLYIAM_CASDOOR_COUNTRY_CODE=CN`（组织默认区域影响手机号解析） |
 | 自动初始化失败 | 确认 Casdoor 已就绪且 `casdoor_application` 中存在 `app-built-in` |
 | 修改了 `CASDOOR_DEFAULT_PASSWORD` 但 Casdoor 登录仍为 `123` | `123` 是 Casdoor 内置管理员 `built-in/admin` 的硬编码密码，不受配置影响；业务管理员请用 `flyiam/admin` + 配置的默认密码登录 |
