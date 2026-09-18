@@ -292,11 +292,6 @@ env:
   - name: LOG_FORMAT
     value: {{ .Values.logFormat | quote }}
 
-  {{- if .Values.serviceToken }}
-  - name: SERVICE_TOKEN
-    value: {{ .Values.serviceToken | quote }}
-  {{- end }}
-
   # 安全与跨域配置
   - name: AUTH_COOKIE_SAMESITE
     value: {{ .Values.authCookieSameSite | quote }}
@@ -338,6 +333,10 @@ secret:
   CASDOOR_CLIENT_SECRET: {{ .Values.casdoorClientSecret | quote }}
   {{- if .Values.datasourceHttpApiAuthToken }}
   DATASOURCE_HTTPAPI_AUTH_TOKEN: {{ .Values.datasourceHttpApiAuthToken | quote }}
+  {{- end }}
+  {{- if .Values.serviceToken }}
+  # 服务间调用凭证（供 Consul Manager 同步用户字段；经 Secret 注入，不落 env 明文）
+  SERVICE_TOKEN: {{ .Values.serviceToken | quote }}
   {{- end }}
 
 # ============================================
