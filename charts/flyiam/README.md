@@ -109,6 +109,12 @@ charts/flyiam/
 | `FLYIAM_PERMISSION_ADMIN_USERS` | 超级管理员名单（逗号分隔） | 空（依赖 Casdoor `isAdmin`） |
 | `FLYIAM_CASDOOR_PROTECTED_USERS` | 受保护用户（逗号分隔，同步/删除时跳过） | 空（`<组织>/admin` 始终受保护） |
 | `FLYIAM_CASDOOR_ALLOWED_REDIRECT_HOSTS` | 回调地址主机白名单（逗号分隔） | 空 |
+| `FLYIAM_CASDOOR_COUNTRY_CODE` | 手机号区域代码 | `CN` |
+| `FLYIAM_CASDOOR_SYNC_ENABLED` | 启用同步到 Casdoor | `true` |
+| `FLYIAM_CASDOOR_SYNC_AUTO` | 数据源变更后自动同步 | `true` |
+| `FLYIAM_CASDOOR_SYNC_BATCH_SIZE` | 批量同步大小 | `50` |
+| `FLYIAM_CASDOOR_SYNC_RETRY_TIMES` | 失败重试次数 | `3` |
+| `FLYIAM_CASDOOR_SYNC_RETRY_INTERVAL` | 重试间隔（秒） | `5` |
 
 > **引导必需（Chart 保留）**：`FLYIAM_DB_*`、`FLYIAM_REDIS_*`、`FLYIAM_JWT_SECRET`、
 > `FLYIAM_ADMIN_PASSWORD`、`FLYIAM_CASDOOR_ENDPOINT` / `_PUBLIC_ENDPOINT` /

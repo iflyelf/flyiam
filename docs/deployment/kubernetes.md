@@ -179,6 +179,7 @@ Casdoor 与 FlyIAM **共用同一数据库**（表前缀 `casdoor_`），
 | `FLYIAM_PERMISSION_ADMIN_USERS` | 超级管理员名单（逗号分隔） | 空（依赖 Casdoor `isAdmin`） |
 | `FLYIAM_CASDOOR_PROTECTED_USERS` | 受保护用户（逗号分隔） | 空 |
 | `FLYIAM_CASDOOR_COUNTRY_CODE` | 手机号区域 | `CN` |
+| `FLYIAM_CASDOOR_SYNC_ENABLED` / `_AUTO` / `_BATCH_SIZE` / `_RETRY_TIMES` / `_RETRY_INTERVAL` | Casdoor 同步参数 | `true`/`true`/`50`/`3`/`5` |
 
 > **页面可配置（已从 Chart 移除）**：安全/跨域、审计、权限、日志、JWT 过期/签发者、
 > 管理员用户名/邮箱等存于数据库（**DB 优先 / env 兜底**），
