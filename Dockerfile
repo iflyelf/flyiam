@@ -4,7 +4,7 @@
 #  runtime: iflyelf/ubuntu:lite（精简体）             #
 #############################
 
-# 构建基础镜像（含 Go / Node / Python / 编译工具链，仅更新依赖即可）
+# 构建基础镜像（含 Go / Node / Python / 编译工具链，无需额外安装）
 ARG BUILDER_IMAGE=iflyelf/ubuntu:latest
 # 运行基础镜像（精简，仅含运行时所需基础包）
 ARG RUNTIME_IMAGE=iflyelf/ubuntu:lite
@@ -25,11 +25,7 @@ ARG GIT_COMMIT=unknown
 # Go 模块代理（构建基础镜像已内置，这里允许覆盖）
 ARG GOPROXY=https://goproxy.cn,direct
 
-# 仅更新依赖包到最新（基础镜像已含全部工具链，无需重装 PKG_DEPS）
-RUN set -eux && \
-    DEBIAN_FRONTEND=noninteractive apt-get update -qqy && \
-    DEBIAN_FRONTEND=noninteractive apt-get upgrade -qqy --option=Dpkg::Options::=--force-confdef && \
-    rm -rf /var/lib/apt/lists/*
+# 说明：构建基础镜像已预装 Go/Node/Python 及全部依赖，无需再 apt 更新/安装。
 
 WORKDIR /src
 
