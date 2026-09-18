@@ -9,16 +9,16 @@ import "time"
 //   - ExpiresAt 为 nil 表示永久有效；
 //   - 可随时在页面吊销。
 type ApiToken struct {
-	ID         int64      `db:"id" json:"id"`
-	Username   string     `db:"username" json:"username"`
-	Name       string     `db:"name" json:"name"`
-	TokenHash  string     `db:"token_hash" json:"-"`
+	ID        int64  `db:"id" json:"id"`
+	Username  string `db:"username" json:"username"`
+	Name      string `db:"name" json:"name"`
+	TokenHash string `db:"token_hash" json:"-"`
 	// TokenPrefix 令牌前缀（便于辨认，非敏感）
-	TokenPrefix string    `db:"token_prefix" json:"tokenPrefix"`
-	ExpiresAt  *time.Time `db:"expires_at" json:"expiresAt,omitempty"`
-	Enabled    bool       `db:"enabled" json:"enabled"`
-	LastUsedAt *time.Time `db:"last_used_at" json:"lastUsedAt,omitempty"`
-	CreatedAt  time.Time  `db:"created_at" json:"createdAt"`
+	TokenPrefix string     `db:"token_prefix" json:"tokenPrefix"`
+	ExpiresAt   *time.Time `db:"expires_at" json:"expiresAt,omitempty"`
+	Enabled     bool       `db:"enabled" json:"enabled"`
+	LastUsedAt  *time.Time `db:"last_used_at" json:"lastUsedAt,omitempty"`
+	CreatedAt   time.Time  `db:"created_at" json:"createdAt"`
 }
 
 // Expired 判断令牌是否已过期

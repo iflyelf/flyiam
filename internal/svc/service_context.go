@@ -23,10 +23,10 @@ import (
 // ServiceContext 服务上下文
 type ServiceContext struct {
 	// Config 使用指针：页面修改设置后直接写回，既有读取点自动生效（无需重启）
-	Config         *config.Config
-	Settings       *setting.Service
-	DB             sqlx.SqlConn
-	rawDB          *sql.DB
+	Config   *config.Config
+	Settings *setting.Service
+	DB       sqlx.SqlConn
+	rawDB    *sql.DB
 	// casdoorRef 原子指针：页面修改 Casdoor 连接配置后可热重载（免重启）
 	casdoorRef     atomic.Pointer[casdoor.Client]
 	Cache          *cache.Cache
@@ -252,9 +252,9 @@ func releaseSchemaLock(conn *sql.Conn) {
 // 说明：这是「显式白名单」，只清理确知无用的历史遗留表，绝不动态推断，
 // 以免误删 Casdoor / Casbin 或其它第三方表。请在废弃某表时将其加入此清单。
 var deprecatedTables = []string{
-	"users",         // 旧版本本地用户表（现用户唯一存储于 Casdoor）
+	"users",          // 旧版本本地用户表（现用户唯一存储于 Casdoor）
 	"resigned_users", // 旧版本离职用户表
-	"departments",   // 旧版本部门表
+	"departments",    // 旧版本部门表
 }
 
 // deprecatedColumns 明确废弃的列：启动时自动清理。

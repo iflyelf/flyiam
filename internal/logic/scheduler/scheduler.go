@@ -16,7 +16,7 @@ import (
 
 // Scheduler 定时任务调度器
 type Scheduler struct {
-	db       sqlx.SqlConn
+	db sqlx.SqlConn
 	// casdoorFn 运行时获取当前 Casdoor 客户端（支持热重载后自动用新客户端）
 	casdoorFn func() *casdoor.Client
 	baseTick  time.Duration
