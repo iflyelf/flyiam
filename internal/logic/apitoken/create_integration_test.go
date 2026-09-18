@@ -47,10 +47,28 @@ func TestCreateIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Create 失败: %v", err)
 		}
-		if token == "" || info == nil || info.ExpiresAt != nil {
+		if token == "" || info == nil || info.ExpiresAt.Valid {
 			t.Fatalf("返回异常: token=%q info=%+v", token, info)
 		}
 		defer db.Exec(`DELETE FROM api_tokens WHERE id=$1`, info.ID)
+
+		// 回读验证 NULL 可被正常扫描（回归：曾报 unsupported Scan ... *time.Time）
+		list, err := l.List(ctx, "ut-user")
+		if err != nil {
+			t.Fatalf("List 失败: %v", err)
+		}
+		found := false
+		for _, it := range list {
+			if it.ID == info.ID {
+				found = true
+				if it.ExpiresAt.Valid {
+					t.Fatalf("ExpiresAt 应为无效（永久）: %+v", it.ExpiresAt)
+				}
+			}
+		}
+		if !found {
+			t.Fatal("回读未找到刚创建的令牌")
+		}
 	})
 
 	t.Run("固定有效期", func(t *testing.T) {
@@ -58,7 +76,7 @@ func TestCreateIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Create 失败: %v", err)
 		}
-		if info.ExpiresAt == nil || !info.ExpiresAt.After(time.Now()) {
+		if !info.ExpiresAt.Valid || !info.ExpiresAt.Time.After(time.Now()) {
 			t.Fatalf("有效期异常: %+v", info.ExpiresAt)
 		}
 		defer db.Exec(`DELETE FROM api_tokens WHERE id=$1`, info.ID)

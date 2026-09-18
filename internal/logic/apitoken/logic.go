@@ -66,18 +66,11 @@ func (l *Logic) Create(ctx context.Context, username, name string, expiresInDays
 		name = "API 令牌"
 	}
 
-	var expiresAt *time.Time
+	// 可空时间用 model.NullTime：既避免 (*time.Time)(nil) 触发 go-zero
+	// sqlx.writeValue 的 String() panic，也避免读取时无法扫描 NULL。
+	expiresAt := model.NullTime{}
 	if expiresInDays > 0 {
-		t := time.Now().AddDate(0, 0, expiresInDays)
-		expiresAt = &t
-	}
-
-	// 注意：不能把 (*time.Time)(nil) 直接作为 SQL 参数传给 go-zero sqlx：
-	// 其 sqlx.writeValue 对 `case *time.Time` 会调用 v.String()，
-	// nil 指针会 panic（表现为接口 500 空响应）。永久有效（nil）时传无类型 nil。
-	var expiresArg any
-	if expiresAt != nil {
-		expiresArg = *expiresAt
+		expiresAt = model.NullTime{Time: time.Now().AddDate(0, 0, expiresInDays), Valid: true}
 	}
 
 	prefix := token
@@ -88,7 +81,9 @@ func (l *Logic) Create(ctx context.Context, username, name string, expiresInDays
 	var id int64
 	query := `INSERT INTO api_tokens (username, name, token_hash, token_prefix, expires_at, enabled, created_at)
 		VALUES ($1,$2,$3,$4,$5,TRUE,NOW()) RETURNING id`
-	if err := l.db.QueryRowCtx(ctx, &id, query, username, name, hashToken(token), prefix, expiresArg); err != nil {
+	// 传 driver.Value（nil 或 time.Time），使 SQL 日志可读且兼容 go-zero 格式化。
+	expiresVal, _ := expiresAt.Value()
+	if err := l.db.QueryRowCtx(ctx, &id, query, username, name, hashToken(token), prefix, expiresVal); err != nil {
 		return "", nil, fmt.Errorf("保存令牌失败: %w", err)
 	}
 
