@@ -101,6 +101,27 @@ func (l *Logic) Revoke(ctx context.Context, id int64, username string) error {
 	return nil
 }
 
+// lastUsedSem 限制「异步更新最后使用时间」的并发 goroutine 数。
+//
+// 背景：Validate 每次调用都会更新 last_used_at，若直接 `go func()` 则高并发下
+// goroutine 数量无界增长。这里用带缓冲信号量兜底：并发已满时直接跳过更新
+// （last_used_at 非关键数据，允许丢失），保证 goroutine 数恒定有界。
+var lastUsedSem = make(chan struct{}, 64)
+
+// touchLastUsed 异步更新令牌最后使用时间（有界并发，失败不影响校验）。
+func (l *Logic) touchLastUsed(id int64) {
+	select {
+	case lastUsedSem <- struct{}{}:
+		go func() {
+			defer func() { <-lastUsedSem }()
+			_, _ = l.db.ExecCtx(context.Background(),
+				`UPDATE api_tokens SET last_used_at = NOW() WHERE id = $1`, id)
+		}()
+	default:
+		// 并发已满，跳过本次更新（非关键路径）
+	}
+}
+
 // Validate 校验令牌，返回归属用户名（有效则同时更新最后使用时间）
 func (l *Logic) Validate(ctx context.Context, token string) (string, error) {
 	if token == "" {
@@ -117,10 +138,6 @@ func (l *Logic) Validate(ctx context.Context, token string) (string, error) {
 	if t.Expired() {
 		return "", fmt.Errorf("令牌已过期")
 	}
-	// 异步更新最后使用时间（失败不影响校验）
-	go func() {
-		_, _ = l.db.ExecCtx(context.Background(),
-			`UPDATE api_tokens SET last_used_at = NOW() WHERE id = $1`, t.ID)
-	}()
+	l.touchLastUsed(t.ID)
 	return t.Username, nil
 }

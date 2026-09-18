@@ -171,9 +171,6 @@ func (l *SyncLogic) SyncFromDataSources(ctx context.Context, opts SyncOptions, t
 		log.Printf("🗑️  已从 Casdoor 删除 %d 名不存在于数据源的用户", deleted)
 	}
 
-	// 同步后使缓存失效
-	l.casdoorClient.InvalidateUsersCache()
-
 	duration := time.Since(startTime)
 	log.Printf("✅ 同步完成: 成功 %d/%d（新增 %d，更新 %d），失败 %d，删除 %d，耗时 %v",
 		result.Success, result.Total, result.Created, result.Updated, result.Failed, deleted, duration)

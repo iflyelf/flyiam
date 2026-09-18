@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/iflyelf/flyiam/internal/config"
 	"github.com/iflyelf/flyiam/internal/handler"
@@ -116,9 +115,6 @@ func main() {
 	<-quit
 
 	logx.Info("正在关闭服务器...")
-	_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	server.Stop()
 	logx.Info("服务器已关闭")
 }

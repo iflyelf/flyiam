@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"runtime/debug"
 	"time"
 
 	dslogic "github.com/iflyelf/flyiam/internal/logic/datasource"
@@ -47,7 +48,15 @@ func (s *Scheduler) loop(ctx context.Context) {
 			log.Println("⏰ 定时任务调度器已停止")
 			return
 		case <-ticker.C:
-			s.tick(ctx)
+			// panic 兜底：单次调度异常不应终止调度循环/整个进程。
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("💥 定时任务调度 panic（已恢复）: %v\n%s", r, debug.Stack())
+					}
+				}()
+				s.tick(ctx)
+			}()
 		}
 	}
 }

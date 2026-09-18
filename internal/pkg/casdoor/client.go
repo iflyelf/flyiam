@@ -44,10 +44,6 @@ type Client struct {
 
 	protected   map[string]struct{}
 	protectedMu sync.RWMutex
-
-	cacheMu      sync.RWMutex
-	usersCache   []*casdoorsdk.User
-	usersCacheAt time.Time
 }
 
 // IsProtected 判断用户是否为受保护用户（不允许删除）
@@ -249,6 +245,12 @@ func (c *Client) WatchAdminCredentials(interval time.Duration, maxAttempts int) 
 		interval = 10 * time.Second
 	}
 	go func() {
+		// panic 兜底：后台重试 goroutine 内 panic 会终止整个进程
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("💥 管理凭据补读 goroutine panic（已恢复）: %v", r)
+			}
+		}()
 		for i := 0; i < maxAttempts; i++ {
 			time.Sleep(interval)
 			if c.AdminReady() {
@@ -568,21 +570,6 @@ func (c *Client) ParseToken(token string) (*Claims, error) {
 	return result, nil
 }
 
-// GetUsersByOrg 按组织过滤用户（实时）
-func (c *Client) GetUsersByOrg() ([]*casdoorsdk.User, error) {
-	all, err := c.GetUsers()
-	if err != nil {
-		return nil, err
-	}
-	out := make([]*casdoorsdk.User, 0, len(all))
-	for _, u := range all {
-		if u.Owner == c.organization {
-			out = append(out, u)
-		}
-	}
-	return out, nil
-}
-
 // usersPageSize 分页遍历默认页大小
 const usersPageSize = 200
 
@@ -623,40 +610,6 @@ func hasMoreUsersPage(page, pageSize, total, got int) bool {
 		return false
 	}
 	return page*pageSize < total
-}
-
-// GetUsersByOrgCached 按组织获取用户（带内存缓存，降低全量查询压力）
-func (c *Client) GetUsersByOrgCached() ([]*casdoorsdk.User, error) {
-	ttl := time.Duration(c.config.UserCacheTTL) * time.Second
-	if ttl <= 0 {
-		return c.GetUsersByOrg()
-	}
-
-	c.cacheMu.RLock()
-	if c.usersCache != nil && time.Since(c.usersCacheAt) < ttl {
-		data := c.usersCache
-		c.cacheMu.RUnlock()
-		return data, nil
-	}
-	c.cacheMu.RUnlock()
-
-	users, err := c.GetUsersByOrg()
-	if err != nil {
-		return nil, err
-	}
-	c.cacheMu.Lock()
-	c.usersCache = users
-	c.usersCacheAt = time.Now()
-	c.cacheMu.Unlock()
-	return users, nil
-}
-
-// InvalidateUsersCache 使缓存失效（同步后调用）
-func (c *Client) InvalidateUsersCache() {
-	c.cacheMu.Lock()
-	c.usersCache = nil
-	c.usersCacheAt = time.Time{}
-	c.cacheMu.Unlock()
 }
 
 // GetUsersPage 服务端分页查询用户（支持按字段模糊搜索）
@@ -761,7 +714,6 @@ func (c *Client) BatchDeleteUsers(ctx context.Context, names []string) (int, []s
 		}
 		deleted++
 	}
-	c.InvalidateUsersCache()
 	return deleted, skipped, failed
 }
 
@@ -805,15 +757,6 @@ func (c *Client) GetUser(name string) (*casdoorsdk.User, error) {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 	return user, nil
-}
-
-// GetUsers 获取用户列表
-func (c *Client) GetUsers() ([]*casdoorsdk.User, error) {
-	users, err := c.bizSDK.GetUsers()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get users: %w", err)
-	}
-	return users, nil
 }
 
 // AddUser 添加用户

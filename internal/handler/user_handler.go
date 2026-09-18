@@ -204,7 +204,6 @@ func CreateUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusBadGateway, "新增用户失败")
 			return
 		}
-		svcCtx.Casdoor().InvalidateUsersCache()
 		ok(w, casdoorToView(svcCtx, user))
 	}
 }
@@ -237,7 +236,6 @@ func UpdateUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusBadGateway, "更新用户失败: "+friendlyCasdoorErr(err.Error()))
 			return
 		}
-		svcCtx.Casdoor().InvalidateUsersCache()
 		ok(w, casdoorToView(svcCtx, existing))
 	}
 }
@@ -263,7 +261,6 @@ func DeleteUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 		cleanupUserAssociations(r.Context(), svcCtx, []string{name})
-		svcCtx.Casdoor().InvalidateUsersCache()
 		ok(w, nil)
 	}
 }
@@ -493,7 +490,6 @@ func SetUserAdminHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusBadGateway, err.Error())
 			return
 		}
-		svcCtx.Casdoor().InvalidateUsersCache()
 		ok(w, nil)
 	}
 }
