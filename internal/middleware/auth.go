@@ -31,7 +31,7 @@ func Auth(svcCtx *svc.ServiceContext) func(http.HandlerFunc) http.HandlerFunc {
 				writeUnauthorized(w, "未登录")
 				return
 			}
-			claims, err := parseToken(svcCtx.Config.JWT.Secret, token)
+			claims, err := parseToken(svcCtx.Config().JWT.Secret, token)
 			if err != nil {
 				writeUnauthorized(w, "登录已过期，请重新登录")
 				return
@@ -63,7 +63,7 @@ func RequirePermission(svcCtx *svc.ServiceContext, permission string) func(http.
 				next(w, r)
 				return
 			}
-			logic := rbac.NewLogic(svcCtx.DB, svcCtx.Config.Permission.AdminUsers)
+			logic := rbac.NewLogic(svcCtx.DB, svcCtx.Config().Permission.AdminUsers)
 			allowed, err := logic.HasPermission(r.Context(), username, permission)
 			if err != nil {
 				writeForbidden(w, "权限校验失败: "+err.Error())

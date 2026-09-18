@@ -42,7 +42,7 @@ func ServiceAuth(svcCtx *svc.ServiceContext) func(http.HandlerFunc) http.Handler
 			}
 
 			// 2. 全局 SERVICE_TOKEN（常量时间比较）
-			expected := svcCtx.Config.Service.Token
+			expected := svcCtx.Config().Service.Token
 			if expected != "" && got != "" &&
 				subtle.ConstantTimeCompare([]byte(got), []byte(expected)) == 1 {
 				next(w, r)
@@ -72,7 +72,7 @@ func extractServiceToken(r *http.Request) string {
 // isAdminUserByUsername 判断用户是否为管理员（Casdoor isAdmin 或超级管理员名单）。
 // Casdoor 不可用时仅信任超级管理员名单（fail-closed 倾向）。
 func isAdminUserByUsername(svcCtx *svc.ServiceContext, username string) bool {
-	logic := rbac.NewLogic(svcCtx.DB, svcCtx.Config.Permission.AdminUsers)
+	logic := rbac.NewLogic(svcCtx.DB, svcCtx.Config().Permission.AdminUsers)
 	if logic.IsSuperAdmin(username) {
 		return true
 	}

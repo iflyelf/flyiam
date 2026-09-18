@@ -352,23 +352,23 @@ func casdoorToView(svcCtx *svc.ServiceContext, u *casdoorsdk.User) model.UserVie
 func buildNewUser(svcCtx *svc.ServiceContext, p *userPayload) *casdoorsdk.User {
 	password := p.Password
 	if password == "" {
-		password = svcCtx.Config.Casdoor.DefaultPassword
+		password = svcCtx.Config().Casdoor.DefaultPassword
 	}
 	return &casdoorsdk.User{
-		Owner:             svcCtx.Config.Casdoor.OrganizationName,
+		Owner:             svcCtx.Config().Casdoor.OrganizationName,
 		Name:              p.DomainAccount,
 		DisplayName:       p.Name,
 		Avatar:            p.Avatar,
 		Email:             p.WorkEmail,
 		Phone:             p.Phone,
-		CountryCode:       svcCtx.Config.Casdoor.CountryCode,
+		CountryCode:       svcCtx.Config().Casdoor.CountryCode,
 		Password:          password,
 		Type:              "normal-user",
 		Language:          "zh",
 		Tag:               "manual",
 		Address:           []string{},
 		Properties:        payloadProps(p),
-		SignupApplication: svcCtx.Config.Casdoor.ApplicationName,
+		SignupApplication: svcCtx.Config().Casdoor.ApplicationName,
 	}
 }
 
@@ -378,7 +378,7 @@ func applyUserPayload(svcCtx *svc.ServiceContext, u *casdoorsdk.User, p *userPay
 	u.Avatar = p.Avatar
 	u.Email = p.WorkEmail
 	u.Phone = p.Phone
-	u.CountryCode = svcCtx.Config.Casdoor.CountryCode
+	u.CountryCode = svcCtx.Config().Casdoor.CountryCode
 	u.Tag = "manual"
 	if u.Properties == nil {
 		u.Properties = map[string]string{}

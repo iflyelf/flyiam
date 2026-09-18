@@ -22,8 +22,9 @@ import (
 
 // ServiceContext 服务上下文
 type ServiceContext struct {
-	// Config 使用指针：页面修改设置后直接写回，既有读取点自动生效（无需重启）
-	Config   *config.Config
+	// cfgStore 原子配置快照：页面修改设置后写时复制并整体替换，
+	// 读者经 Config() 获取不可变快照，避免共享 *Config 的读写数据竞争。
+	cfgStore *config.Store
 	Settings *setting.Service
 	DB       sqlx.SqlConn
 	rawDB    *sql.DB
@@ -31,6 +32,11 @@ type ServiceContext struct {
 	casdoorRef     atomic.Pointer[casdoor.Client]
 	Cache          *cache.Cache
 	ProtectedLogic *protected.Logic
+}
+
+// Config 返回当前配置快照（只读，调用方不得修改）。
+func (s *ServiceContext) Config() *config.Config {
+	return s.cfgStore.Get()
 }
 
 // Casdoor 返回当前 Casdoor 客户端（可能已被热重载替换）
@@ -43,7 +49,7 @@ func (s *ServiceContext) Casdoor() *casdoor.Client {
 // 触发时机：页面修改 casdoor.* 设置后。重建使用最新配置；
 // 若业务应用凭据为空（自动初始化场景），会重新读取内置应用凭据并补齐。
 func (s *ServiceContext) ReloadCasdoor(ctx context.Context) error {
-	client, err := buildCasdoorClient(s.rawDB, *s.Config, 5*time.Second)
+	client, err := buildCasdoorClient(s.rawDB, *s.Config(), 5*time.Second)
 	if err != nil {
 		return err
 	}
@@ -54,16 +60,17 @@ func (s *ServiceContext) ReloadCasdoor(ctx context.Context) error {
 	}
 	s.casdoorRef.Store(client)
 	log.Printf("🔄 Casdoor 客户端已热重载（endpoint=%s，organization=%s）",
-		s.Config.Casdoor.Endpoint, s.Config.Casdoor.OrganizationName)
+		s.Config().Casdoor.Endpoint, s.Config().Casdoor.OrganizationName)
 	return nil
 }
 
 // CookieConfig 返回登录 Cookie 配置（来自 config.Security）
 func (s *ServiceContext) CookieConfig() config.CookieConfig {
+	cfg := s.Config()
 	return config.CookieConfig{
-		SameSite: s.Config.Security.CookieSameSite,
-		Secure:   s.Config.Security.CookieSecure,
-		Domain:   s.Config.Security.CookieDomain,
+		SameSite: cfg.Security.CookieSameSite,
+		Secure:   cfg.Security.CookieSecure,
+		Domain:   cfg.Security.CookieDomain,
 	}
 }
 
@@ -79,19 +86,21 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 
 	// 加载页面设置（DB 优先 / env 兜底），在初始化 Casdoor 客户端前应用，
 	// 使数据库中的连接类配置也能在首次启动生效。
-	settings := setting.NewService(sqlx.NewSqlConnFromDB(db), c)
+	cfgStore := config.NewStore(c)
+	settings := setting.NewService(sqlx.NewSqlConnFromDB(db), cfgStore)
 	if err := settings.Load(context.Background()); err != nil {
 		log.Printf("⚠️ 加载应用设置失败（将使用环境变量默认值）: %v", err)
 	}
+	svcCfg := cfgStore.Get()
 
 	// Casdoor 连接配置校验须在 settings.Load 之后：
 	// 这些字段可由「系统设置」页面（数据库）提供，此时已合并 DB 值。
-	if err := c.ValidateCasdoor(); err != nil {
+	if err := svcCfg.ValidateCasdoor(); err != nil {
 		log.Fatalf("❌ Casdoor 配置校验失败: %v", err)
 	}
 
 	// 初始化 Casdoor 客户端（含自动初始化组织/应用/管理员）
-	casdoorClient, err := initCasdoorClient(db, *c)
+	casdoorClient, err := initCasdoorClient(db, *svcCfg)
 	if err != nil {
 		log.Fatalf("❌ 初始化 Casdoor 客户端失败: %v", err)
 	}
@@ -99,7 +108,7 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 	// 从数据库加载受保护用户（表为空时用配置文件种子初始化）
 	protectedLogic := protected.NewLogic(sqlx.NewSqlConnFromDB(db))
 	seedCtx, seedCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	if err := protectedLogic.SeedIfEmpty(seedCtx, c.Casdoor.ProtectedUsers); err != nil {
+	if err := protectedLogic.SeedIfEmpty(seedCtx, svcCfg.Casdoor.ProtectedUsers); err != nil {
 		log.Printf("⚠️ 初始化受保护用户失败: %v", err)
 	}
 	if accounts, err := protectedLogic.Accounts(seedCtx); err == nil {
@@ -110,16 +119,16 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 
 	// 初始化 Redis 缓存（连接失败自动降级，不影响启动）
 	cacheClient := cache.New(cache.Config{
-		Enabled:  c.Redis.Enabled,
-		Host:     c.Redis.Host,
-		Port:     c.Redis.Port,
-		Password: c.Redis.Password,
-		DB:       c.Redis.DB,
-		TTL:      c.Redis.TTL,
+		Enabled:  svcCfg.Redis.Enabled,
+		Host:     svcCfg.Redis.Host,
+		Port:     svcCfg.Redis.Port,
+		Password: svcCfg.Redis.Password,
+		DB:       svcCfg.Redis.DB,
+		TTL:      svcCfg.Redis.TTL,
 	})
 
 	svcCtx := &ServiceContext{
-		Config:         c,
+		cfgStore:       cfgStore,
 		Settings:       settings,
 		DB:             sqlx.NewSqlConnFromDB(db),
 		rawDB:          db,
@@ -691,7 +700,6 @@ func buildCasdoorClient(db *sql.DB, c config.Config, waitTimeout time.Duration) 
 		ApplicationDisplayName:  c.Casdoor.ApplicationDisplayName,
 		DefaultPassword:         c.Casdoor.DefaultPassword,
 		CountryCode:             c.Casdoor.CountryCode,
-		UserCacheTTL:            c.Casdoor.UserCacheTTL,
 		ProtectedUsers:          c.Casdoor.ProtectedUsers,
 		AutoRedirectURI:         c.Casdoor.AutoRedirectURI,
 		RedirectURIs:            c.Casdoor.RedirectURIs,

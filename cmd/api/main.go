@@ -70,12 +70,14 @@ func main() {
 	// 初始化服务上下文（数据库、Casdoor、缓存、页面设置）。
 	// 注意：需在创建服务器前完成，使页面设置（如跨域来源）能在启动时生效。
 	svcCtx := svc.NewServiceContext(&c)
+	// 合并页面设置后的当前配置快照（只读）
+	curCfg := svcCtx.Config()
 
 	// 创建 REST 服务器
 	// 关键：未匹配的请求交给 SPA 处理器，用于提供前端静态文件与前端路由回退
 	opts := []rest.RunOption{
 		rest.WithNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if c.Web.Embedded {
+			if curCfg.Web.Embedded {
 				web.SPAHandler().ServeHTTP(w, r)
 			} else {
 				http.NotFound(w, r)
@@ -85,9 +87,9 @@ func main() {
 	// 跨域支持：仅当前端与后端不同源时配置 CORS_ALLOWED_ORIGINS。
 	// go-zero 对具体 origin 会同时下发 Access-Control-Allow-Credentials: true，
 	// 从而允许跨域携带登录 Cookie（需配合 AUTH_COOKIE_SAMESITE=none + HTTPS）。
-	if len(c.Security.CORSAllowedOrigins) > 0 {
-		logx.Infof("已启用跨域访问，允许来源: %v", c.Security.CORSAllowedOrigins)
-		opts = append(opts, rest.WithCors(c.Security.CORSAllowedOrigins...))
+	if len(curCfg.Security.CORSAllowedOrigins) > 0 {
+		logx.Infof("已启用跨域访问，允许来源: %v", curCfg.Security.CORSAllowedOrigins)
+		opts = append(opts, rest.WithCors(curCfg.Security.CORSAllowedOrigins...))
 	}
 	server := rest.MustNewServer(c.RestConf, opts...)
 	defer server.Stop()
@@ -101,7 +103,7 @@ func main() {
 	handler.RegisterHandlers(server, svcCtx)
 
 	// 打印服务信息
-	printServerInfo(c)
+	printServerInfo(*curCfg)
 
 	// 启动服务器
 	go func() {

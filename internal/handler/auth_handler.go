@@ -136,7 +136,7 @@ func CallbackHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		// 登录凭证写入 HttpOnly Cookie（JS 不可读，降低 XSS 窃取风险），
 		// 前端不再需要接触 token。
 		cookieCfg := svcCtx.CookieConfig()
-		http.SetCookie(w, cookieCfg.NewAuthCookie(middleware.AuthCookieName, localToken, svcCtx.Config.JWT.AccessExpire, r))
+		http.SetCookie(w, cookieCfg.NewAuthCookie(middleware.AuthCookieName, localToken, svcCtx.Config().JWT.AccessExpire, r))
 
 		// 仅携带非敏感展示信息跳转前端回调页（token 不再出现在 URL）
 		target := fmt.Sprintf("/callback?name=%s&displayName=%s&email=%s",
@@ -168,7 +168,7 @@ func isAdminUser(svcCtx *svc.ServiceContext, claims *casdoor.Claims) bool {
 	if claims.IsAdmin {
 		return true
 	}
-	logic := rbac.NewLogic(svcCtx.DB, svcCtx.Config.Permission.AdminUsers)
+	logic := rbac.NewLogic(svcCtx.DB, svcCtx.Config().Permission.AdminUsers)
 	return logic.IsSuperAdmin(claims.Name)
 }
 
@@ -207,7 +207,7 @@ func UserInfoHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 
 		username, _ := claims["username"].(string)
 		isAdmin, _ := claims["isAdmin"].(bool)
-		logic := rbac.NewLogic(svcCtx.DB, svcCtx.Config.Permission.AdminUsers)
+		logic := rbac.NewLogic(svcCtx.DB, svcCtx.Config().Permission.AdminUsers)
 		isSuperAdmin := isAdmin || logic.IsSuperAdmin(username)
 
 		// 防御：历史签发的非管理员 Token 在过期前仍可能被使用，此处再次拦截
@@ -276,7 +276,7 @@ func ChangePasswordHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 func AuthConfigHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ok(w, map[string]string{
-			"appName":   svcCtx.Config.Name,
+			"appName":   svcCtx.Config().Name,
 			"loginPath": "/api/auth/login",
 		})
 	}
@@ -284,7 +284,7 @@ func AuthConfigHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 
 // signLocalToken 基于 Casdoor 用户信息签发本地 JWT
 func signLocalToken(svcCtx *svc.ServiceContext, claims *casdoor.Claims) (string, error) {
-	expire := svcCtx.Config.JWT.AccessExpire
+	expire := svcCtx.Config().JWT.AccessExpire
 	if expire <= 0 {
 		expire = 7200
 	}
@@ -300,7 +300,7 @@ func signLocalToken(svcCtx *svc.ServiceContext, claims *casdoor.Claims) (string,
 		"iat":      now.Unix(),
 		"exp":      now.Add(time.Duration(expire) * time.Second).Unix(),
 	})
-	return token.SignedString([]byte(svcCtx.Config.JWT.Secret))
+	return token.SignedString([]byte(svcCtx.Config().JWT.Secret))
 }
 
 // parseLocalToken 解析本地 JWT
@@ -308,7 +308,7 @@ func signLocalToken(svcCtx *svc.ServiceContext, claims *casdoor.Claims) (string,
 // 限定签名算法为 HS256，避免算法混淆攻击。
 func parseLocalToken(svcCtx *svc.ServiceContext, tokenStr string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
-		return []byte(svcCtx.Config.JWT.Secret), nil
+		return []byte(svcCtx.Config().JWT.Secret), nil
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 	if err != nil || !token.Valid {
 		return nil, fmt.Errorf("无效 Token")

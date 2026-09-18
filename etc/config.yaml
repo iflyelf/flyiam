@@ -87,8 +87,6 @@ Casdoor:
   DefaultPassword: ""
   # 用户手机号所属国家/地区代码（ISO 3166-1 alpha-2，环境变量: CASDOOR_COUNTRY_CODE）
   CountryCode: "CN"
-  # 用户列表内存缓存时长（秒），降低 Casdoor 全量查询压力（环境变量: CASDOOR_USER_CACHE_TTL）
-  UserCacheTTL: 30
   # 启动时自动初始化 Casdoor（组织/应用/管理员）（环境变量: CASDOOR_AUTO_SETUP）
   AutoSetup: true
   # 登录回调地址不存在时自动追加白名单（环境变量: CASDOOR_AUTO_REDIRECT_URI）

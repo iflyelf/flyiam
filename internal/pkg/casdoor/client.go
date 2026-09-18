@@ -19,6 +19,28 @@ import (
 // adminRetryInterval 管理凭据补读的最小间隔（失败节流，避免每次请求都查库）
 const adminRetryInterval = 30 * time.Second
 
+// httpClientOnce 保证 http 客户端只注入 SDK 全局一次。
+//
+// 背景：casdoorsdk.SetHttpClient 是「无锁的包级全局赋值」，而 SDK 请求会
+// 并发读取该全局。若每次热重载都调用，会与在途请求产生数据竞争，且反复
+// 新建 http.Client 会丢弃连接池。此处用 sync.Once 只注入一次。
+var httpClientOnce sync.Once
+
+func ensureHTTPClient() {
+	httpClientOnce.Do(func() {
+		// SDK 默认使用 &http.Client{}（无超时），Casdoor/反代 hang 住会导致
+		// 请求协程与连接堆积；这里注入带超时与连接池的客户端。
+		casdoorsdk.SetHttpClient(&http.Client{
+			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				MaxIdleConns:        100,
+				MaxIdleConnsPerHost: 20,
+				IdleConnTimeout:     90 * time.Second,
+			},
+		})
+	})
+}
+
 // Client Casdoor 客户端
 type Client struct {
 	config       *Config
@@ -99,7 +121,6 @@ type Config struct {
 	ApplicationDisplayName string
 	DefaultPassword        string
 	CountryCode            string
-	UserCacheTTL           int
 	ProtectedUsers         []string
 	// AutoRedirectURI 为 true 时，登录回调地址不存在于应用白名单会自动追加
 	AutoRedirectURI bool
@@ -134,15 +155,8 @@ func NewClient(cfg *Config) (*Client, error) {
 		ApplicationName:  cfg.ApplicationName,
 	}
 
-	// 为 SDK 注入带超时的 HTTP 客户端（SDK 默认 &http.Client{} 无超时）
-	casdoorsdk.SetHttpClient(&http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			MaxIdleConns:        100,
-			MaxIdleConnsPerHost: 20,
-			IdleConnTimeout:     90 * time.Second,
-		},
-	})
+	// 为 SDK 注入带超时的 HTTP 客户端（仅首次生效，避免并发写 SDK 全局）
+	ensureHTTPClient()
 
 	// 业务应用凭据的实例客户端。
 	// 不再调用 casdoorsdk.InitConfig：它写入包级全局变量且无锁，

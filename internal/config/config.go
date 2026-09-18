@@ -65,8 +65,6 @@ type Config struct {
 		// CountryCode 用户手机号所属国家/地区代码（ISO 3166-1 alpha-2，如 CN/US），
 		// 用于 Casdoor 按区域正确解析并校验手机号，避免使用组织默认区域导致误判。
 		CountryCode string `json:",default=CN,env=CASDOOR_COUNTRY_CODE"`
-		// UserCacheTTL 用户列表内存缓存时长（秒），降低 Casdoor 全量查询压力
-		UserCacheTTL int `json:",default=30,env=CASDOOR_USER_CACHE_TTL"`
 		// ProtectedUsers 受保护用户（域账号），仅在数据库表为空时作为种子写入
 		ProtectedUsers []string `json:",optional"`
 		// AutoRedirectURI 登录回调地址不存在于应用白名单时自动追加

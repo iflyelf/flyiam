@@ -12,7 +12,7 @@ import (
 )
 
 func rbacLogic(svcCtx *svc.ServiceContext) *rbac.Logic {
-	return rbac.NewLogic(svcCtx.DB, svcCtx.Config.Permission.AdminUsers)
+	return rbac.NewLogic(svcCtx.DB, svcCtx.Config().Permission.AdminUsers)
 }
 
 func pathInt64(r *http.Request, key string) (int64, bool) {
