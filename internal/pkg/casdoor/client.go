@@ -25,6 +25,9 @@ type Client struct {
 	authConfig   *casdoorsdk.AuthConfig
 	organization string
 	application  string
+	// bizSDK 使用业务应用凭据的 SDK 实例（用于本组织用户/认证等操作）。
+	// 全程使用实例客户端，避免依赖 SDK 包级全局配置被其他凭据覆盖。
+	bizSDK *casdoorsdk.Client
 
 	// adminSDK 使用内置应用 app-built-in 凭据的独立 SDK 实例，
 	// 专用于「应用 / 组织管理」等需要全局管理员权限的接口。
@@ -130,8 +133,20 @@ func NewClient(cfg *Config) (*Client, error) {
 		ApplicationName:  cfg.ApplicationName,
 	}
 
-	// 初始化 Casdoor SDK
-	casdoorsdk.InitConfig(
+	// 为 SDK 注入带超时的 HTTP 客户端（SDK 默认 &http.Client{} 无超时）
+	casdoorsdk.SetHttpClient(&http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 20,
+			IdleConnTimeout:     90 * time.Second,
+		},
+	})
+
+	// 业务应用凭据的实例客户端。
+	// 不再调用 casdoorsdk.InitConfig：它写入包级全局变量且无锁，
+	// 与管理凭据会互相覆盖（顺序敏感），全程使用实例客户端以彻底隔离。
+	bizSDK := casdoorsdk.NewClient(
 		cfg.Endpoint,
 		cfg.ClientId,
 		cfg.ClientSecret,
@@ -155,6 +170,7 @@ func NewClient(cfg *Config) (*Client, error) {
 		authConfig:   authConfig,
 		organization: cfg.OrganizationName,
 		application:  cfg.ApplicationName,
+		bizSDK:       bizSDK,
 		protected:    protected,
 	}
 	if cfg.AdminClientId != "" && cfg.AdminClientSecret != "" {
@@ -398,7 +414,9 @@ func (c *Client) ListOrganizations() ([]*casdoorsdk.Organization, error) {
 	}
 	req.SetBasicAuth(adminID, adminSecret)
 
-	resp, err := http.DefaultClient.Do(req)
+	// 使用带超时的客户端，避免 Casdoor/反向代理 hang 住导致连接堆积
+	httpClient := &http.Client{Timeout: 15 * time.Second}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("请求 Casdoor 失败: %w", err)
 	}
@@ -582,7 +600,7 @@ func (c *Client) GetUsersPage(page, pageSize int, field, value string) ([]*casdo
 		queryMap["field"] = field
 		queryMap["value"] = value
 	}
-	return casdoorsdk.GetPaginationUsers(page, pageSize, queryMap)
+	return c.bizSDK.GetPaginationUsers(page, pageSize, queryMap)
 }
 
 // GetUserCount 获取组织用户总数
@@ -626,17 +644,17 @@ func (c *Client) ProtectedUsers() []string {
 
 // GetSignupUrl 获取注册 URL
 func (c *Client) GetSignupUrl(enablePassword bool, redirectUri string) string {
-	return casdoorsdk.GetSignupUrl(enablePassword, redirectUri)
+	return c.bizSDK.GetSignupUrl(enablePassword, redirectUri)
 }
 
 // GetUserProfileUrl 获取用户信息 URL
 func (c *Client) GetUserProfileUrl(userName string, redirectUri string) string {
-	return casdoorsdk.GetUserProfileUrl(userName, redirectUri)
+	return c.bizSDK.GetUserProfileUrl(userName, redirectUri)
 }
 
 // ParseJwtToken 解析 JWT Token 并获取用户信息
 func (c *Client) ParseJwtToken(token string) (*casdoorsdk.Claims, error) {
-	claims, err := casdoorsdk.ParseJwtToken(token)
+	claims, err := c.bizSDK.ParseJwtToken(token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse JWT token: %w", err)
 	}
@@ -645,7 +663,7 @@ func (c *Client) ParseJwtToken(token string) (*casdoorsdk.Claims, error) {
 
 // GetOAuthToken 通过 code 获取 OAuth Token
 func (c *Client) GetOAuthToken(code string, state string) (string, error) {
-	token, err := casdoorsdk.GetOAuthToken(code, state)
+	token, err := c.bizSDK.GetOAuthToken(code, state)
 	if err != nil {
 		return "", fmt.Errorf("failed to get OAuth token: %w", err)
 	}
@@ -654,7 +672,7 @@ func (c *Client) GetOAuthToken(code string, state string) (string, error) {
 
 // GetUser 获取用户信息
 func (c *Client) GetUser(name string) (*casdoorsdk.User, error) {
-	user, err := casdoorsdk.GetUser(name)
+	user, err := c.bizSDK.GetUser(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
@@ -663,7 +681,7 @@ func (c *Client) GetUser(name string) (*casdoorsdk.User, error) {
 
 // GetUsers 获取用户列表
 func (c *Client) GetUsers() ([]*casdoorsdk.User, error) {
-	users, err := casdoorsdk.GetUsers()
+	users, err := c.bizSDK.GetUsers()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get users: %w", err)
 	}
@@ -682,7 +700,7 @@ func (c *Client) AddUser(user *casdoorsdk.User) (bool, error) {
 		user.Password = c.config.DefaultPassword
 	}
 
-	affected, err := casdoorsdk.AddUser(user)
+	affected, err := c.bizSDK.AddUser(user)
 	if err != nil {
 		return false, fmt.Errorf("failed to add user: %w", err)
 	}
@@ -691,7 +709,7 @@ func (c *Client) AddUser(user *casdoorsdk.User) (bool, error) {
 
 // UpdateUser 更新用户
 func (c *Client) UpdateUser(user *casdoorsdk.User) (bool, error) {
-	affected, err := casdoorsdk.UpdateUser(user)
+	affected, err := c.bizSDK.UpdateUser(user)
 	if err != nil {
 		return false, fmt.Errorf("failed to update user: %w", err)
 	}
@@ -704,7 +722,7 @@ func (c *Client) DeleteUser(name string) (bool, error) {
 		Owner: c.organization,
 		Name:  name,
 	}
-	affected, err := casdoorsdk.DeleteUser(user)
+	affected, err := c.bizSDK.DeleteUser(user)
 	if err != nil {
 		return false, fmt.Errorf("failed to delete user: %w", err)
 	}
@@ -736,7 +754,7 @@ func (c *Client) GetOrganization(name string) (*casdoorsdk.Organization, error) 
 			return org, nil
 		}
 	}
-	org, err := casdoorsdk.GetOrganization(name)
+	org, err := c.bizSDK.GetOrganization(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get organization: %w", err)
 	}
@@ -793,7 +811,7 @@ func (c *Client) DeleteOrganization(name string) (bool, error) {
 
 // SetUserPassword 设置用户密码（oldPassword 为空表示管理员重置）
 func (c *Client) SetUserPassword(name, oldPassword, newPassword string) (bool, error) {
-	ok, err := casdoorsdk.SetPassword(c.organization, name, oldPassword, newPassword)
+	ok, err := c.bizSDK.SetPassword(c.organization, name, oldPassword, newPassword)
 	if err != nil {
 		return false, fmt.Errorf("设置密码失败: %w", err)
 	}
@@ -810,7 +828,7 @@ func (c *Client) SetUserAdmin(name string, isAdmin bool) error {
 		return fmt.Errorf("用户不存在")
 	}
 	user.IsAdmin = isAdmin
-	if _, err := casdoorsdk.UpdateUser(user); err != nil {
+	if _, err := c.bizSDK.UpdateUser(user); err != nil {
 		return fmt.Errorf("更新用户管理员标记失败: %w", err)
 	}
 	return nil

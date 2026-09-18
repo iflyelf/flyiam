@@ -6,9 +6,47 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"time"
 
 	casdoorsdk "github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 )
+
+// 瞬时错误的有界重试参数
+const (
+	syncRetryAttempts = 3
+	syncRetryInterval = 1 * time.Second
+)
+
+// isTransientErr 判断是否为可重试的瞬时错误（网络/超时/5xx）
+func isTransientErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	for _, k := range []string{
+		"timeout", "timed out", "connection", "temporarily",
+		"eof", "reset by peer", "no such host", "502", "503", "504",
+	} {
+		if strings.Contains(msg, k) {
+			return true
+		}
+	}
+	return false
+}
+
+// withRetry 对瞬时错误进行有界重试（非瞬时错误立即返回）
+func withRetry(attempts int, interval time.Duration, fn func() error) error {
+	var err error
+	for i := 0; i < attempts; i++ {
+		if err = fn(); err == nil || !isTransientErr(err) {
+			return err
+		}
+		if i < attempts-1 {
+			time.Sleep(interval)
+		}
+	}
+	return err
+}
 
 // SyncUser 同步用户到 Casdoor
 type SyncUser struct {
@@ -149,8 +187,10 @@ func (c *Client) createNewUser(user SyncUser) error {
 		Properties:        props,
 		SignupApplication: c.application,
 	}
-	_, err := c.AddUser(casdoorUser)
-	return err
+	return withRetry(syncRetryAttempts, syncRetryInterval, func() error {
+		_, err := c.AddUser(casdoorUser)
+		return err
+	})
 }
 
 // updateExistingUser 更新已存在的用户
@@ -169,8 +209,10 @@ func (c *Client) updateExistingUser(existing *casdoorsdk.User, newData SyncUser)
 			existing.Properties[k] = v
 		}
 	}
-	_, err := c.UpdateUser(existing)
-	return err
+	return withRetry(syncRetryAttempts, syncRetryInterval, func() error {
+		_, err := c.UpdateUser(existing)
+		return err
+	})
 }
 
 // SyncOrganization 同步组织到 Casdoor

@@ -41,22 +41,24 @@ func EnsureSetup(db *sql.DB, cfg *Config) (*BootstrapResult, error) {
 		return nil, err
 	}
 
-	// 使用内置凭据初始化 SDK，用于管理操作
-	casdoorsdk.InitConfig(cfg.Endpoint, builtinID, builtinSecret, "", "built-in", "app-built-in")
+	// 使用内置凭据构建**独立的实例客户端**用于管理操作。
+	// 不使用 casdoorsdk.InitConfig：它写入 SDK 包级全局变量且无锁，
+	// 与业务凭据的全局配置会互相覆盖（顺序敏感），改用实例彻底隔离。
+	admin := casdoorsdk.NewClient(cfg.Endpoint, builtinID, builtinSecret, "", "built-in", "app-built-in")
 
 	// 2. 确保组织存在
-	if err := ensureOrganization(cfg); err != nil {
+	if err := ensureOrganization(admin, cfg); err != nil {
 		return nil, err
 	}
 
 	// 3. 确保应用存在（clientId/secret 以配置为准，未配置则自动生成并持久化）
-	clientID, clientSecret, err := ensureApplication(cfg)
+	clientID, clientSecret, err := ensureApplication(admin, cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	// 4. 确保组织管理员账号存在
-	if err := ensureAdminUser(cfg); err != nil {
+	if err := ensureAdminUser(admin, cfg); err != nil {
 		return nil, err
 	}
 
@@ -87,8 +89,8 @@ func ReadBuiltinApp(db *sql.DB) (string, string, error) {
 }
 
 // ensureOrganization 确保业务组织存在，并配置中文与地区
-func ensureOrganization(cfg *Config) error {
-	org, err := casdoorsdk.GetOrganization(cfg.OrganizationName)
+func ensureOrganization(sdk *casdoorsdk.Client, cfg *Config) error {
+	org, err := sdk.GetOrganization(cfg.OrganizationName)
 	if err != nil || org == nil || org.Name == "" {
 		org = &casdoorsdk.Organization{
 			Owner:              "admin",
@@ -100,7 +102,7 @@ func ensureOrganization(cfg *Config) error {
 			DefaultApplication: cfg.ApplicationName,
 			DefaultPassword:    cfg.DefaultPassword,
 		}
-		if _, err := casdoorsdk.AddOrganization(org); err != nil {
+		if _, err := sdk.AddOrganization(org); err != nil {
 			return fmt.Errorf("创建组织失败: %w", err)
 		}
 		log.Printf("✅ Casdoor 组织已创建: %s", cfg.OrganizationName)
@@ -130,7 +132,7 @@ func ensureOrganization(cfg *Config) error {
 		changed = true
 	}
 	if changed {
-		if _, err := casdoorsdk.UpdateOrganization(org); err != nil {
+		if _, err := sdk.UpdateOrganization(org); err != nil {
 			return fmt.Errorf("更新组织失败: %w", err)
 		}
 		log.Printf("✅ Casdoor 组织已更新: %s", cfg.OrganizationName)
@@ -139,8 +141,8 @@ func ensureOrganization(cfg *Config) error {
 }
 
 // ensureApplication 确保业务应用存在，返回最终生效的 clientId/clientSecret
-func ensureApplication(cfg *Config) (string, string, error) {
-	app, err := casdoorsdk.GetApplication(cfg.ApplicationName)
+func ensureApplication(sdk *casdoorsdk.Client, cfg *Config) (string, string, error) {
+	app, err := sdk.GetApplication(cfg.ApplicationName)
 	exists := err == nil && app != nil && app.Name != ""
 	if !exists {
 		clientID := cfg.ClientId
@@ -173,7 +175,7 @@ func ensureApplication(cfg *Config) (string, string, error) {
 			RefreshExpireInHours: 168,
 			CookieExpireInHours:  720,
 		}
-		if _, err := casdoorsdk.AddApplication(app); err != nil {
+		if _, err := sdk.AddApplication(app); err != nil {
 			return "", "", fmt.Errorf("创建应用失败: %w", err)
 		}
 		log.Printf("✅ Casdoor 应用已创建: %s (clientId=%s)", cfg.ApplicationName, clientID)
@@ -204,7 +206,7 @@ func ensureApplication(cfg *Config) (string, string, error) {
 		changed = true
 	}
 	if changed {
-		if _, err := casdoorsdk.UpdateApplication(app); err != nil {
+		if _, err := sdk.UpdateApplication(app); err != nil {
 			return "", "", fmt.Errorf("更新应用失败: %w", err)
 		}
 		log.Printf("✅ Casdoor 应用已更新: %s", cfg.ApplicationName)
@@ -213,7 +215,7 @@ func ensureApplication(cfg *Config) (string, string, error) {
 }
 
 // ensureAdminUser 确保组织管理员账号存在（幂等）
-func ensureAdminUser(cfg *Config) error {
+func ensureAdminUser(sdk *casdoorsdk.Client, cfg *Config) error {
 	admin := &casdoorsdk.User{
 		Owner:             cfg.OrganizationName,
 		Name:              "admin",
@@ -227,7 +229,7 @@ func ensureAdminUser(cfg *Config) error {
 		SignupApplication: cfg.ApplicationName,
 		Properties:        map[string]string{"empCode": "admin"},
 	}
-	if _, err := casdoorsdk.AddUser(admin); err != nil {
+	if _, err := sdk.AddUser(admin); err != nil {
 		// 已存在视为成功（幂等）
 		if strings.Contains(err.Error(), "already exists") {
 			return nil
