@@ -57,7 +57,9 @@ repositories: []
 templates:
   default: &default
     createNamespace: true
-    wait: true
+    # 不等待资源就绪：镜像拉取（尤其 docker.io 慢速）会拖长 --wait 等待并超时。
+    # 改为提交清单即返回，Pod 由集群自行拉取镜像并启动。
+    wait: false
     force: false
     recreatePods: false
     cleanupOnFail: true
