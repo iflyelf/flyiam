@@ -292,6 +292,11 @@ env:
   - name: LOG_FORMAT
     value: {{ .Values.logFormat | quote }}
 
+  {{- if .Values.serviceToken }}
+  - name: SERVICE_TOKEN
+    value: {{ .Values.serviceToken | quote }}
+  {{- end }}
+
   # 安全与跨域配置
   - name: AUTH_COOKIE_SAMESITE
     value: {{ .Values.authCookieSameSite | quote }}

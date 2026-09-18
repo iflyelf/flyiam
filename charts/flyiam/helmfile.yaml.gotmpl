@@ -130,6 +130,8 @@ releases:
       # 日志配置
       - logLevel: {{ .Values.logLevel | quote }}
       - logFormat: {{ .Values.logFormat | quote }}
+      # 服务间调用配置
+      - serviceToken: {{ .Values.serviceToken | quote }}
       # 安全与跨域配置
       - authCookieSameSite: {{ .Values.authCookieSameSite | quote }}
       - authCookieSecure: {{ .Values.authCookieSecure | quote }}

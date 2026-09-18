@@ -113,6 +113,7 @@ charts/flyiam/
 | `FLYIAM_AUTH_COOKIE_SECURE` | 登录 Cookie Secure（`auto`/`true`/`false`） | `auto` |
 | `FLYIAM_AUTH_COOKIE_DOMAIN` | 登录 Cookie 作用域（跨子域共享） | 空 |
 | `FLYIAM_CORS_ALLOWED_ORIGINS` | 允许的跨域来源（逗号分隔，为空关闭） | 空 |
+| `FLYIAM_SERVICE_TOKEN` | 服务间调用凭证（供 Consul Manager 同步用户字段；留空关闭） | 空 |
 | `CASDOOR_ENABLED` | 部署内置 Casdoor | `true` |
 | `CASDOOR_REPLICAS` | Casdoor 副本数 | `2` |
 | `CASDOOR_REDIS_SESSION_ENABLED` | Casdoor 会话是否用 Redis 共享（多副本必须开启） | 跟随 `FLYIAM_REDIS_ENABLED`（默认 `true`） |

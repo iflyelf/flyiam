@@ -94,6 +94,13 @@ type Config struct {
 		StaticDir string `json:",default=./web/dist,env=WEB_STATIC_DIR"`
 	}
 
+	// Service 服务间调用配置（供其它系统如 Consul Manager 拉取配置）
+	Service struct {
+		// Token 服务间调用凭证（环境变量 SERVICE_TOKEN）。
+		// 留空则不开放服务间接口。
+		Token string `json:",optional,env=SERVICE_TOKEN"`
+	}
+
 	// Security 登录凭证与跨域相关配置
 	Security struct {
 		// CookieSameSite 登录 Cookie 的 SameSite 策略：lax / strict / none

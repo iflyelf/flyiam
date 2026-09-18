@@ -204,6 +204,11 @@ logLevel: '{{ env "FLYIAM_LOG_LEVEL" | default "info" }}'
 # 日志格式（json / text）
 logFormat: '{{ env "FLYIAM_LOG_FORMAT" | default "json" }}'
 
+# ==================== 服务间调用配置 ====================
+# 服务间调用凭证（供 Consul Manager 等同步用户字段定义）。
+# 留空则不开放 /api/user-fields/export 接口。
+serviceToken: '{{ env "FLYIAM_SERVICE_TOKEN" | default "" }}'
+
 # ==================== 安全与跨域配置 ====================
 # 登录 Cookie 的 SameSite 策略：lax / strict / none
 #   同源部署（前端嵌入后端，默认）用 lax；
