@@ -140,13 +140,47 @@ func CallbackHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 
-		// 跳转前端回调页，携带本地 token（全部做 URL 编码，避免注入额外参数）
-		target := fmt.Sprintf("/callback?token=%s&name=%s&displayName=%s&email=%s",
-			url.QueryEscape(localToken),
+		// 登录凭证写入 HttpOnly Cookie（JS 不可读，降低 XSS 窃取风险），
+		// 前端不再需要接触 token。
+		setAuthCookie(w, r, localToken, svcCtx.Config.JWT.AccessExpire)
+
+		// 仅携带非敏感展示信息跳转前端回调页（token 不再出现在 URL）
+		target := fmt.Sprintf("/callback?name=%s&displayName=%s&email=%s",
 			url.QueryEscape(claims.Name),
 			url.QueryEscape(claims.DisplayName),
 			url.QueryEscape(claims.Email))
 		http.Redirect(w, r, target, http.StatusFound)
+	}
+}
+
+// setAuthCookie 写入登录凭证 Cookie
+func setAuthCookie(w http.ResponseWriter, r *http.Request, token string, maxAge int) {
+	if maxAge <= 0 {
+		maxAge = 7200
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     middleware.AuthCookieName,
+		Value:    token,
+		Path:     "/",
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
+	})
+}
+
+// LogoutHandler 退出登录：清除登录 Cookie
+func LogoutHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.SetCookie(w, &http.Cookie{
+			Name:     middleware.AuthCookieName,
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		})
+		ok(w, nil)
 	}
 }
 

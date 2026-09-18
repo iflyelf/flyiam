@@ -6,6 +6,12 @@ export function getAuthConfig() {
 }
 
 // 获取当前登录用户信息
-export function getUserInfo() {
-  return request.get('/api/auth/userinfo')
+// silent=true 时不触发全局 401 跳转（用于路由守卫的登录态探测）
+export function getUserInfo(silent = false) {
+  return request.get('/api/auth/userinfo', silent ? { skipAuthRedirect: true } : undefined)
+}
+
+// 退出登录（清除服务端 HttpOnly Cookie）
+export function logout() {
+  return request.post('/api/auth/logout')
 }

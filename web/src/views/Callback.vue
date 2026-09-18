@@ -13,27 +13,20 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { Loading, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
-const route = useRoute()
 const authStore = useAuthStore()
 
 const status = ref('loading')
 const message = ref('正在完成登录...')
 
 onMounted(async () => {
-  const token = route.query.token
-  if (!token) {
-    status.value = 'error'
-    message.value = '登录失败：缺少凭证'
-    setTimeout(() => router.push('/login'), 2000)
-    return
-  }
+  // 登录凭证由后端以 HttpOnly Cookie 下发，前端不再从 URL 读取 token
   try {
-    await authStore.handleCallback(token)
+    await authStore.handleCallback()
     status.value = 'success'
     message.value = '登录成功，正在跳转...'
     setTimeout(() => router.push('/'), 800)

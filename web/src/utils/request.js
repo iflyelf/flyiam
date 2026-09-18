@@ -2,17 +2,11 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
 // 同源请求（生产环境前后端一体，开发环境由 Vite 代理 /api）
+// 登录凭证由后端 HttpOnly Cookie 承载，浏览器自动携带，前端不保存 token。
 const request = axios.create({
   baseURL: '',
-  timeout: 120000
-})
-
-request.interceptors.request.use((config) => {
-  const token = localStorage.getItem('flyiam_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
+  timeout: 120000,
+  withCredentials: true
 })
 
 request.interceptors.response.use(
@@ -28,9 +22,10 @@ request.interceptors.response.use(
     const status = err.response?.status
     const msg = err.response?.data?.message || err.message || '请求失败'
     if (status === 401) {
-      localStorage.removeItem('flyiam_token')
       localStorage.removeItem('flyiam_user')
-      if (window.location.pathname !== '/login') {
+      // 登录态探测请求（skipAuthRedirect）不触发跳转，交由路由守卫处理
+      const skip = err.config?.skipAuthRedirect
+      if (!skip && window.location.pathname !== '/login') {
         window.location.href = '/login'
       }
     } else {

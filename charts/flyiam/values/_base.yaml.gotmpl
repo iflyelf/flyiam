@@ -48,7 +48,7 @@ dbName: '{{ env "FLYIAM_DB_NAME" | default "flyiam" }}'
 # 数据库用户名
 dbUser: '{{ env "FLYIAM_DB_USER" | default "flyiam" }}'
 # 数据库密码（优先从环境变量读取，生产环境建议使用 existingSecret）
-dbPassword: '{{ env "FLYIAM_DB_PASSWORD" | default "" }}'
+dbPassword: '{{ env "FLYIAM_DB_PASSWORD" | default "ysyh!9Sky" }}'
 # 数据库 SSL 模式
 dbSslMode: '{{ env "FLYIAM_DB_SSL_MODE" | default "disable" }}'
 # 数据库连接池配置
@@ -64,7 +64,7 @@ redisHost: '{{ env "FLYIAM_REDIS_HOST" | default "redis.default.svc.cluster.loca
 # Redis 端口
 redisPort: {{ env "FLYIAM_REDIS_PORT" | default "6379" }}
 # Redis 密码（优先从环境变量读取）
-redisPassword: '{{ env "FLYIAM_REDIS_PASSWORD" | default "" }}'
+redisPassword: '{{ env "FLYIAM_REDIS_PASSWORD" | default "ysyh!9Sky" }}'
 # Redis 数据库编号
 redisDb: {{ env "FLYIAM_REDIS_DB" | default "0" }}
 # Redis 缓存 TTL（秒）
@@ -72,7 +72,7 @@ redisCacheTtl: {{ env "FLYIAM_REDIS_CACHE_TTL" | default "300" }}
 
 # ==================== JWT 配置 ====================
 # JWT 密钥（必填，建议 32 位以上随机字符串，生产环境必须使用 existingSecret）
-jwtSecret: '{{ env "FLYIAM_JWT_SECRET" | default "" }}'
+jwtSecret: '{{ env "FLYIAM_JWT_SECRET" | default "ysyh!9SkyFlyIAMSecretKey2024xxxxxxxx" }}'
 # JWT Access Token 过期时间（秒，默认 2 小时）
 jwtAccessExpire: {{ env "FLYIAM_JWT_ACCESS_EXPIRE" | default "7200" }}
 # JWT Refresh Token 过期时间（秒，默认 7 天）
@@ -84,7 +84,7 @@ jwtIssuer: '{{ env "FLYIAM_JWT_ISSUER" | default "flyiam" }}'
 # 管理员用户名
 adminUsername: '{{ env "FLYIAM_ADMIN_USERNAME" | default "admin" }}'
 # 管理员密码（生产环境必须使用 existingSecret）
-adminPassword: '{{ env "FLYIAM_ADMIN_PASSWORD" | default "" }}'
+adminPassword: '{{ env "FLYIAM_ADMIN_PASSWORD" | default "ysyh!9Sky" }}'
 # 管理员邮箱
 adminEmail: '{{ env "FLYIAM_ADMIN_EMAIL" | default "admin@example.com" }}'
 
@@ -152,7 +152,7 @@ casdoorOrganizationDisplayName: '{{ env "FLYIAM_CASDOOR_ORGANIZATION_DISPLAY_NAM
 casdoorApplicationName: '{{ env "FLYIAM_CASDOOR_APPLICATION" | default "flyiam" }}'
 casdoorApplicationDisplayName: '{{ env "FLYIAM_CASDOOR_APPLICATION_DISPLAY_NAME" | default "FlyIAM" }}'
 # 新用户默认密码（不再提供代码内默认值，此处仅作为 Chart 注入默认，生产请覆盖）
-casdoorDefaultPassword: '{{ env "FLYIAM_CASDOOR_DEFAULT_PASSWORD" | default "" }}'
+casdoorDefaultPassword: '{{ env "FLYIAM_CASDOOR_DEFAULT_PASSWORD" | default "ysyh!9Sky" }}'
 # 允许自动追加回调地址的主机白名单（逗号分隔）。
 # 非空时仅允许这些主机的回调自动写入 Casdoor，防止 Host 头伪造（开放重定向）。
 casdoorAllowedRedirectHosts: '{{ env "FLYIAM_CASDOOR_ALLOWED_REDIRECT_HOSTS" | default "" }}'

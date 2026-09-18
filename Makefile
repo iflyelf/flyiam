@@ -1,6 +1,9 @@
-.PHONY: help build build-backend-only run test clean install web-build docker-build all version
+.PHONY: help build build-backend-only run test clean install web-build docker-build all version schema
 
 .DEFAULT_GOAL := help
+
+# 数据库连接串（导出表结构用，可通过环境变量覆盖）
+DATABASE_URL ?= postgresql://flyiam:ysyh!9Sky@localhost:5432/flyiam?sslmode=disable
 
 # 变量定义
 APP_NAME := flyiam
@@ -89,6 +92,21 @@ docker-build:
 ## all: 完整构建（前端+后端）
 all: clean install web-build build
 	@echo "✅ 完整构建完成"
+
+## schema: 从运行中的数据库导出表结构快照（避免手工维护过期）
+schema:
+	@command -v pg_dump >/dev/null 2>&1 || { echo "❌ 需要 pg_dump（postgresql-client）"; exit 1; }
+	@echo "📤 导出表结构到 deploy/sql/schema.sql ..."
+	@printf '%s\n' \
+	  '-- =============================================================================' \
+	  '-- FlyIAM 数据库表结构（自动生成，请勿手工编辑）' \
+	  '--' \
+	  '-- 生成方式：make schema（pg_dump --schema-only）' \
+	  '-- 权威来源：程序启动时按代码内嵌 DDL 自动建表；本文件仅为审计/参考快照。' \
+	  '-- =============================================================================' \
+	  > deploy/sql/schema.sql
+	pg_dump --schema-only --no-owner --no-privileges "$(DATABASE_URL)" >> deploy/sql/schema.sql
+	@echo "✅ 已生成: deploy/sql/schema.sql"
 
 ## version: 显示版本信息
 version:

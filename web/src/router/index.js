@@ -123,22 +123,22 @@ window.addEventListener('vite:preloadError', () => reloadOnce())
 window.addEventListener('load', () => sessionStorage.removeItem(CHUNK_RELOAD_KEY))
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
-  
-  // 初始化 auth store
-  if (!authStore.isAuthenticated) {
-    authStore.init()
+
+  // 初始化/探测登录态（凭证在 HttpOnly Cookie，需向后端确认）
+  if (!authStore.initialized) {
+    await authStore.init()
   }
 
   // 需要认证的路由
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')
-  } 
+  }
   // 已登录访问登录页，重定向到首页
   else if (to.path === '/login' && authStore.isAuthenticated) {
     next('/')
-  } 
+  }
   else {
     next()
   }

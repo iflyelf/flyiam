@@ -18,6 +18,8 @@ const (
 	CtxUsername ctxKey = "username"
 	// CtxCasdoorAdmin 上下文中保存 Casdoor isAdmin 标记
 	CtxCasdoorAdmin ctxKey = "casdoorAdmin"
+	// AuthCookieName 登录凭证 Cookie 名（HttpOnly，避免 JS 读取，降低 XSS 窃取风险）
+	AuthCookieName = "flyiam_token"
 )
 
 // Auth 鉴权中间件：校验本地 JWT 并注入用户名
@@ -92,8 +94,14 @@ func IsCasdoorAdmin(ctx context.Context) bool {
 	return false
 }
 
-// extractToken 从请求头或查询参数提取 Token
+// extractToken 提取登录凭证。
+//
+// 优先 HttpOnly Cookie（推荐，JS 无法读取，降低 XSS 窃取风险），
+// 兼容 Authorization: Bearer（API 调用/旧会话）。
 func extractToken(r *http.Request) string {
+	if c, err := r.Cookie(AuthCookieName); err == nil && c.Value != "" {
+		return c.Value
+	}
 	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
 		return strings.TrimPrefix(h, "Bearer ")
 	}

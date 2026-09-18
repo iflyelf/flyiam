@@ -201,7 +201,7 @@ const handleCommand = async (command) => {
         cancelButtonText: '取消',
         type: 'warning'
       })
-      authStore.logout()
+      await authStore.logout()
       ElMessage.success('已退出登录')
       router.push('/login')
     } catch (error) {

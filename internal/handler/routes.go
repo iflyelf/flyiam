@@ -33,6 +33,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodGet, Path: "/api/auth/login", Handler: LoginHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/api/auth/callback", Handler: CallbackHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/api/auth/config", Handler: AuthConfigHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/auth/logout", Handler: LogoutHandler(svcCtx)},
 
 		// 当前用户（需登录）
 		{Method: http.MethodGet, Path: "/api/auth/userinfo", Handler: guard(UserInfoHandler(svcCtx))},

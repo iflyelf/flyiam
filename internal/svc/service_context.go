@@ -191,15 +191,53 @@ func releaseSchemaLock(conn *sql.Conn) {
 	_ = conn.Close()
 }
 
-// warnLegacyTables 检测废弃的本地用户表，仅告警不删除
-func warnLegacyTables(db *sql.DB) {
-	for _, t := range []string{"users", "resigned_users", "departments"} {
+// deprecatedTables 明确废弃的表：程序不再读写，启动时自动清理。
+//
+// 说明：这是「显式白名单」，只清理确知无用的历史遗留表，绝不动态推断，
+// 以免误删 Casdoor / Casbin 或其它第三方表。请在废弃某表时将其加入此清单。
+var deprecatedTables = []string{
+	"users",         // 旧版本本地用户表（现用户唯一存储于 Casdoor）
+	"resigned_users", // 旧版本离职用户表
+	"departments",   // 旧版本部门表
+}
+
+// deprecatedColumns 明确废弃的列：启动时自动清理。
+// 形如 {表名, 列名}；仅删除确知无用的历史列。
+var deprecatedColumns = []struct{ table, column string }{
+	// 预留：后续如有列废弃在此登记，例如 {"sync_logs", "legacy_field"}，
+}
+
+// cleanupDeprecatedSchema 自动清理废弃的表与列（幂等，多副本安全）。
+//
+// 设计目标：升级时无需人工干预即可完成结构维护。
+func cleanupDeprecatedSchema(db *sql.DB) {
+	for _, t := range deprecatedTables {
 		var exists bool
-		err := db.QueryRow(`SELECT EXISTS (SELECT 1 FROM information_schema.tables
-			WHERE table_schema='public' AND table_name=$1)`, t).Scan(&exists)
-		if err == nil && exists {
-			log.Printf("ℹ️ 检测到历史遗留表 %q（已废弃，程序不再读写）；如确认无用可手工 DROP TABLE %s", t, t)
+		if err := db.QueryRow(`SELECT EXISTS (SELECT 1 FROM information_schema.tables
+			WHERE table_schema='public' AND table_name=$1)`, t).Scan(&exists); err != nil || !exists {
+			continue
 		}
+		if _, err := db.Exec("DROP TABLE IF EXISTS " + quoteIdent(t) + " CASCADE"); err != nil {
+			log.Printf("⚠️ 清理废弃表 %s 失败: %v", t, err)
+			continue
+		}
+		log.Printf("🧹 已自动清理废弃表: %s", t)
+	}
+
+	for _, c := range deprecatedColumns {
+		var exists bool
+		if err := db.QueryRow(`SELECT EXISTS (SELECT 1 FROM information_schema.columns
+			WHERE table_schema='public' AND table_name=$1 AND column_name=$2)`,
+			c.table, c.column).Scan(&exists); err != nil || !exists {
+			continue
+		}
+		stmt := fmt.Sprintf("ALTER TABLE %s DROP COLUMN IF EXISTS %s",
+			quoteIdent(c.table), quoteIdent(c.column))
+		if _, err := db.Exec(stmt); err != nil {
+			log.Printf("⚠️ 清理废弃列 %s.%s 失败: %v", c.table, c.column, err)
+			continue
+		}
+		log.Printf("🧹 已自动清理废弃列: %s.%s", c.table, c.column)
 	}
 }
 
@@ -216,13 +254,10 @@ func initSchema(db *sql.DB, c config.Config) error {
 		defer releaseSchemaLock(lockConn)
 	}
 
-	// 本系统不存储任何用户数据（用户唯一存储于 Casdoor）。
-	//
-	// 历史版本的 users / resigned_users / departments 已废弃，程序不再读写。
-	// 注意：不再每次启动无条件 DROP —— 那会导致旧库历史数据不可逆丢失，
-	// 且若存在外键引用还会使 DROP 失败、启动中断。此处仅在检测到这些表
-	// 仍存在时给出提示，由管理员确认后自行清理。
-	warnLegacyTables(db)
+	// 自动清理废弃的表与列（白名单，幂等），实现升级无需人工干预的结构维护。
+	// 本系统不存储用户数据（用户唯一存储于 Casdoor），历史遗留的本地用户表
+	// 已无用途，自动删除以免残留。
+	cleanupDeprecatedSchema(db)
 
 	// 创建同步日志表
 	if err := createSyncLogsTable(db); err != nil {
@@ -377,6 +412,8 @@ func createRBACTables(db *sql.DB) error {
 
 	CREATE INDEX IF NOT EXISTS idx_team_members_username ON team_members(username);
 	CREATE INDEX IF NOT EXISTS idx_team_roles_team ON team_roles(team_id);
+	CREATE INDEX IF NOT EXISTS idx_roles_code ON roles(code);
+	CREATE INDEX IF NOT EXISTS idx_teams_code ON teams(code);
 	`
 	_, err := db.Exec(schema)
 	return err
