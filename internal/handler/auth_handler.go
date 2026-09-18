@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -14,6 +16,18 @@ import (
 	"github.com/iflyelf/flyiam/internal/pkg/casdoor"
 	"github.com/iflyelf/flyiam/internal/svc"
 )
+
+// oauthStateCookie OAuth state 校验用 Cookie 名
+const oauthStateCookie = "flyiam_oauth_state"
+
+// randomState 生成随机 OAuth state
+func randomState() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b)
+}
 
 // requestBaseURL 根据请求推导外部可访问的基础地址
 //
@@ -52,7 +66,19 @@ func LoginHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			log.Printf("✅ 已自动追加回调地址到应用白名单: %s", redirectUri)
 		}
 
-		loginURL := svcCtx.CasdoorClient.GetSigninUrl(redirectUri)
+		// 生成随机 state 并写入 Cookie，回调时校验，防止登录 CSRF
+		state := randomState()
+		http.SetCookie(w, &http.Cookie{
+			Name:     oauthStateCookie,
+			Value:    state,
+			Path:     "/",
+			MaxAge:   600,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+			Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
+		})
+
+		loginURL := svcCtx.CasdoorClient.GetSigninUrl(redirectUri, state)
 
 		if r.URL.Query().Get("format") == "json" {
 			ok(w, map[string]string{"loginUrl": loginURL, "redirectUri": redirectUri})
@@ -74,6 +100,16 @@ func CallbackHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusInternalServerError, "Casdoor 未初始化")
 			return
 		}
+
+		// 校验 OAuth state，防止登录 CSRF（Cookie 与回调参数必须一致）
+		stateCookie, err := r.Cookie(oauthStateCookie)
+		if err != nil || stateCookie.Value == "" || r.URL.Query().Get("state") != stateCookie.Value {
+			log.Printf("🚫 OAuth state 校验失败（可能存在 CSRF）")
+			fail(w, http.StatusBadRequest, "登录校验失败（state 不匹配），请重新登录")
+			return
+		}
+		// 一次性使用：校验后立即失效
+		http.SetCookie(w, &http.Cookie{Name: oauthStateCookie, Value: "", Path: "/", MaxAge: -1})
 
 		accessToken, err := svcCtx.CasdoorClient.GetOAuthToken(code, "")
 		if err != nil {

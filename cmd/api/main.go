@@ -56,6 +56,11 @@ func main() {
 	// 环境变量覆盖（支持容器编排自定义端口/地址等）
 	c.ApplyEnvOverrides()
 
+	// 必填项校验（失败即退出，避免以错误配置运行）
+	if err := c.Validate(); err != nil {
+		logx.Must(err)
+	}
+
 	// 配置日志
 	logx.MustSetup(c.Log)
 

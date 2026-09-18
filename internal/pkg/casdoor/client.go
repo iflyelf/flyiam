@@ -109,6 +109,11 @@ type Config struct {
 	AutoRedirectURI bool
 	// RedirectURIs 应用回调地址白名单（初始化时写入 Casdoor）
 	RedirectURIs []string
+	// AllowedRedirectHosts 允许自动追加回调地址的主机白名单。
+	// 非空时，仅当推导出的回调地址主机在其中才自动追加，
+	// 防止 Host 头被伪造把恶意回调写入 Casdoor 白名单（开放重定向）。
+	// 为空时保持原有行为（追加）并打印告警，建议生产环境显式配置。
+	AllowedRedirectHosts []string
 }
 
 // NewClient 创建 Casdoor 客户端
@@ -374,6 +379,18 @@ func (c *Client) EnsureRedirectURI(redirectURI string) (bool, error) {
 	if !c.config.AutoRedirectURI || redirectURI == "" {
 		return false, nil
 	}
+
+	// 回调地址主机白名单校验：防止 Host 头被伪造导致把恶意回调写入 Casdoor
+	if len(c.config.AllowedRedirectHosts) > 0 {
+		host := hostOf(redirectURI)
+		if host == "" || !containsStr(c.config.AllowedRedirectHosts, host) {
+			return false, fmt.Errorf("回调地址主机 %q 不在允许列表内，拒绝自动追加（如确需请加入 CASDOOR_ALLOWED_REDIRECT_HOSTS）", host)
+		}
+	} else {
+		log.Printf("⚠️ 未配置 CASDOOR_ALLOWED_REDIRECT_HOSTS，回调地址将依据请求 Host 自动追加；" +
+			"生产环境建议配置主机白名单以避免 Host 头伪造")
+	}
+
 	sdk, err := c.adminClient()
 	if err != nil {
 		return false, err
@@ -465,15 +482,24 @@ func (c *Client) PublicEndpoint() string {
 }
 
 // GetSigninUrl 获取登录 URL（基于浏览器可达地址，支持跨域名部署）
-func (c *Client) GetSigninUrl(redirectUri string) string {
+func (c *Client) GetSigninUrl(redirectUri, state string) string {
 	base := strings.TrimRight(c.PublicEndpoint(), "/")
 	return fmt.Sprintf(
 		"%s/login/oauth/authorize?client_id=%s&response_type=code&redirect_uri=%s&scope=openid profile email&state=%s",
 		base,
 		url.QueryEscape(c.config.ClientId),
 		url.QueryEscape(redirectUri),
-		url.QueryEscape(redirectUri),
+		url.QueryEscape(state),
 	)
+}
+
+// hostOf 从 URL 中提取主机名（含端口前的主机部分）
+func hostOf(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
 }
 
 // Claims 精简的 Token 声明

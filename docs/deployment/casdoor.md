@@ -102,6 +102,25 @@ FlyIAM 是管理后台，**只有管理员可以使用**。OAuth 回调阶段即
 > 注意：这与 **Consul Manager 不同**——Consul Manager 允许普通用户登录
 > （仅「用户/团队/角色」等管理页面需要管理员），FlyIAM 则是整体仅管理员可登录。
 
+## 3.0.1 登录安全（state 校验与回调白名单）
+
+- **OAuth state 校验**：登录时生成随机 state 并写入 HttpOnly Cookie，回调时比对，
+  防止登录 CSRF。无需配置。
+- **回调地址主机白名单**：`AutoRedirectURI` 会依据请求 Host 自动把回调地址写入
+  Casdoor 应用白名单。为防止 Host 头被伪造导致开放重定向，生产环境应显式配置
+  允许的主机：
+
+  ```bash
+  export FLYIAM_CASDOOR_ALLOWED_REDIRECT_HOSTS="flyiam.example.com"
+  ```
+
+  非空时，仅白名单内主机的回调会被自动追加；为空时保持原行为并打印告警。
+
+## 3.0.2 默认密码（必填）
+
+`CASDOOR_DEFAULT_PASSWORD` **不再提供代码内默认值**，必须显式注入
+（环境变量 / Secret），否则启动即失败。新增用户与重置密码均使用该值。
+
 ## 3.1 权限模型：应用 / 组织管理需内置应用凭据
 
 Casdoor 的 API 授权中，**只有 `built-in` 组织的身份是全局管理员**

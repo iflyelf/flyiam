@@ -442,6 +442,7 @@ func initCasdoorClient(db *sql.DB, c config.Config) (*casdoor.Client, error) {
 		ProtectedUsers:          c.Casdoor.ProtectedUsers,
 		AutoRedirectURI:         c.Casdoor.AutoRedirectURI,
 		RedirectURIs:            c.Casdoor.RedirectURIs,
+		AllowedRedirectHosts:    c.Casdoor.AllowedRedirectHosts,
 	}
 
 	// 回调地址白名单：仅使用显式配置。

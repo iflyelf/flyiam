@@ -15,6 +15,7 @@ import (
 	"github.com/iflyelf/flyiam/internal/model"
 	"github.com/iflyelf/flyiam/internal/pkg/casdoor"
 	"github.com/iflyelf/flyiam/internal/pkg/datasource"
+	"github.com/lib/pq"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
@@ -208,6 +209,8 @@ func toSyncUser(u datasource.User) casdoor.SyncUser {
 }
 
 // deleteUsers 并发删除用户（跳过受保护用户）
+//
+// 删除成功后级联清理本地关联（team_members），避免悬挂授权。
 func (l *SyncLogic) deleteUsers(ctx context.Context, names []string, concurrency int) int {
 	if concurrency <= 0 {
 		concurrency = 10
@@ -216,6 +219,7 @@ func (l *SyncLogic) deleteUsers(ctx context.Context, names []string, concurrency
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	deleted := 0
+	deletedNames := make([]string, 0, len(names))
 	for _, name := range names {
 		if l.casdoorClient.IsProtected(name) {
 			continue
@@ -228,6 +232,7 @@ func (l *SyncLogic) deleteUsers(ctx context.Context, names []string, concurrency
 			if _, err := l.casdoorClient.DeleteUser(n); err == nil {
 				mu.Lock()
 				deleted++
+				deletedNames = append(deletedNames, n)
 				mu.Unlock()
 			} else {
 				log.Printf("⚠️ 删除用户 %s 失败: %v", n, err)
@@ -235,6 +240,14 @@ func (l *SyncLogic) deleteUsers(ctx context.Context, names []string, concurrency
 		}(name)
 	}
 	wg.Wait()
+
+	// 级联清理本地关联
+	if len(deletedNames) > 0 {
+		if _, err := l.db.ExecCtx(ctx,
+			`DELETE FROM team_members WHERE username = ANY($1)`, pq.Array(deletedNames)); err != nil {
+			log.Printf("⚠️ 清理团队成员关联失败: %v", err)
+		}
+	}
 	return deleted
 }
 

@@ -231,6 +231,10 @@ env:
     value: {{ .Values.casdoorCertificate | quote }}
   - name: CASDOOR_DEFAULT_PASSWORD
     value: {{ .Values.casdoorDefaultPassword | quote }}
+  {{- if .Values.casdoorAllowedRedirectHosts }}
+  - name: CASDOOR_ALLOWED_REDIRECT_HOSTS
+    value: {{ .Values.casdoorAllowedRedirectHosts | quote }}
+  {{- end }}
   - name: CASDOOR_COUNTRY_CODE
     value: {{ .Values.casdoorCountryCode | quote }}
   - name: CASDOOR_AUTO_SETUP

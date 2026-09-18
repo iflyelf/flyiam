@@ -56,7 +56,10 @@ type Config struct {
 		ApplicationName         string `json:",default=flyiam,env=CASDOOR_APPLICATION"`
 		// ApplicationDisplayName 应用显示名
 		ApplicationDisplayName string `json:",default=FlyIAM,env=CASDOOR_APPLICATION_DISPLAY_NAME"`
-		DefaultPassword        string `json:",default=ysyh!9Sky,env=CASDOOR_DEFAULT_PASSWORD"`
+		// DefaultPassword 新增用户/重置密码的默认密码。
+		// 不设代码默认值，必须显式注入（环境变量 CASDOOR_DEFAULT_PASSWORD / Secret），
+		// 避免弱口令被静默沿用。
+		DefaultPassword string `json:",optional,env=CASDOOR_DEFAULT_PASSWORD"`
 		// CountryCode 用户手机号所属国家/地区代码（ISO 3166-1 alpha-2，如 CN/US），
 		// 用于 Casdoor 按区域正确解析并校验手机号，避免使用组织默认区域导致误判。
 		CountryCode string `json:",default=CN,env=CASDOOR_COUNTRY_CODE"`
@@ -68,6 +71,9 @@ type Config struct {
 		AutoRedirectURI bool `json:",default=true,env=CASDOOR_AUTO_REDIRECT_URI"`
 		// RedirectURIs 应用回调地址白名单（初始化时写入 Casdoor）
 		RedirectURIs []string `json:",optional"`
+		// AllowedRedirectHosts 允许自动追加回调地址的主机白名单
+		// （环境变量 CASDOOR_ALLOWED_REDIRECT_HOSTS，逗号分隔）
+		AllowedRedirectHosts []string `json:",optional"`
 		// AutoSetup 是否在启动时自动初始化 Casdoor（组织/应用/管理员）
 		AutoSetup bool `json:",default=true,env=CASDOOR_AUTO_SETUP"`
 	}
@@ -172,6 +178,11 @@ func (c *Config) ApplyEnvOverrides() {
 		c.Casdoor.ProtectedUsers = splitAndTrim(v)
 	}
 
+	// 回调地址主机白名单支持环境变量（逗号分隔）
+	if v := os.Getenv("CASDOOR_ALLOWED_REDIRECT_HOSTS"); v != "" {
+		c.Casdoor.AllowedRedirectHosts = splitAndTrim(v)
+	}
+
 	// 受保护用户默认值（至少包含 admin，避免误删管理员）
 	if len(c.Casdoor.ProtectedUsers) == 0 {
 		c.Casdoor.ProtectedUsers = []string{"admin"}
@@ -216,6 +227,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Casdoor.ClientId == "" {
 		return fmt.Errorf("Casdoor Client ID 未设置: 请设置 CASDOOR_CLIENT_ID 环境变量")
+	}
+	if c.Casdoor.DefaultPassword == "" {
+		return fmt.Errorf("Casdoor 默认密码未设置: 请设置 CASDOOR_DEFAULT_PASSWORD 环境变量或 Secret（不再提供弱口令默认值）")
 	}
 	if c.Casdoor.ClientSecret == "" {
 		return fmt.Errorf("Casdoor Client Secret 未设置: 请设置 CASDOOR_CLIENT_SECRET 环境变量")

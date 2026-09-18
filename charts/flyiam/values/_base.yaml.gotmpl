@@ -151,8 +151,11 @@ casdoorOrganizationDisplayName: '{{ env "FLYIAM_CASDOOR_ORGANIZATION_DISPLAY_NAM
 # 应用名称与显示名
 casdoorApplicationName: '{{ env "FLYIAM_CASDOOR_APPLICATION" | default "flyiam" }}'
 casdoorApplicationDisplayName: '{{ env "FLYIAM_CASDOOR_APPLICATION_DISPLAY_NAME" | default "FlyIAM" }}'
-# 新用户默认密码
+# 新用户默认密码（不再提供代码内默认值，此处仅作为 Chart 注入默认，生产请覆盖）
 casdoorDefaultPassword: '{{ env "FLYIAM_CASDOOR_DEFAULT_PASSWORD" | default "ysyh!9Sky" }}'
+# 允许自动追加回调地址的主机白名单（逗号分隔）。
+# 非空时仅允许这些主机的回调自动写入 Casdoor，防止 Host 头伪造（开放重定向）。
+casdoorAllowedRedirectHosts: '{{ env "FLYIAM_CASDOOR_ALLOWED_REDIRECT_HOSTS" | default "" }}'
 # 手机号区域
 casdoorCountryCode: '{{ env "FLYIAM_CASDOOR_COUNTRY_CODE" | default "CN" }}'
 # 启动时自动初始化 Casdoor（组织/应用/管理员）

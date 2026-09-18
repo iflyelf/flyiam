@@ -87,6 +87,22 @@ type applicationPayload struct {
 	Cert           string   `json:"cert"`
 }
 
+// maskApplication 脱敏应用的敏感字段后再返回。
+//
+// 应用列表/详情仅需展示 clientId 等信息，clientSecret 不应经接口回显
+// （持 casdoor:read 即可读取密钥属越权）。编辑时前端不回传该字段，
+// 留空即保持原值，故脱敏不影响正常编辑。
+func maskApplication(app *casdoorsdk.Application) *casdoorsdk.Application {
+	if app == nil {
+		return nil
+	}
+	masked := *app
+	if masked.ClientSecret != "" {
+		masked.ClientSecret = "******"
+	}
+	return &masked
+}
+
 // ListApplicationsHandler 应用列表
 func ListApplicationsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +115,11 @@ func ListApplicationsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusBadGateway, err.Error())
 			return
 		}
-		ok(w, apps)
+		out := make([]*casdoorsdk.Application, 0, len(apps))
+		for _, app := range apps {
+			out = append(out, maskApplication(app))
+		}
+		ok(w, out)
 	}
 }
 
@@ -112,7 +132,7 @@ func GetApplicationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusNotFound, "应用不存在")
 			return
 		}
-		ok(w, app)
+		ok(w, maskApplication(app))
 	}
 }
 
@@ -146,7 +166,7 @@ func CreateApplicationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusBadGateway, err.Error())
 			return
 		}
-		ok(w, app)
+		ok(w, maskApplication(app))
 	}
 }
 
@@ -187,7 +207,7 @@ func UpdateApplicationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusBadGateway, err.Error())
 			return
 		}
-		ok(w, app)
+		ok(w, maskApplication(app))
 	}
 }
 

@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,8 +11,23 @@ import (
 	casdoorsdk "github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 	"github.com/iflyelf/flyiam/internal/model"
 	"github.com/iflyelf/flyiam/internal/svc"
+	"github.com/lib/pq"
 	"github.com/zeromicro/go-zero/rest/pathvar"
 )
+
+// cleanupUserAssociations 级联清理用户在本地的关联数据（团队成员等）。
+//
+// 用户唯一存储于 Casdoor，但本地 team_members 以用户名为关联键且无外键，
+// 删除用户后若不清理会残留悬挂授权；同名用户重建后可能继承旧权限。
+func cleanupUserAssociations(ctx context.Context, svcCtx *svc.ServiceContext, names []string) {
+	if len(names) == 0 {
+		return
+	}
+	if _, err := svcCtx.DB.ExecCtx(ctx,
+		`DELETE FROM team_members WHERE username = ANY($1)`, pq.Array(names)); err != nil {
+		log.Printf("⚠️ 清理团队成员关联失败: %v", err)
+	}
+}
 
 // userPayload 用户新增/更新入参
 type userPayload struct {
@@ -217,6 +234,7 @@ func DeleteUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusBadGateway, "删除用户失败: "+err.Error())
 			return
 		}
+		cleanupUserAssociations(r.Context(), svcCtx, []string{name})
 		svcCtx.CasdoorClient.InvalidateUsersCache()
 		ok(w, nil)
 	}
@@ -241,6 +259,23 @@ func BatchDeleteUsersHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 		deleted, skipped, failed := svcCtx.CasdoorClient.BatchDeleteUsers(r.Context(), req.Names)
+
+		// 计算成功删除的用户名，级联清理本地关联
+		excluded := make(map[string]struct{}, len(skipped)+len(failed))
+		for _, n := range skipped {
+			excluded[n] = struct{}{}
+		}
+		for _, n := range failed {
+			excluded[n] = struct{}{}
+		}
+		deletedNames := make([]string, 0, len(req.Names))
+		for _, n := range req.Names {
+			if _, skip := excluded[n]; !skip {
+				deletedNames = append(deletedNames, n)
+			}
+		}
+		cleanupUserAssociations(r.Context(), svcCtx, deletedNames)
+
 		ok(w, map[string]interface{}{
 			"deleted": deleted,
 			"skipped": skipped,
