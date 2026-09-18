@@ -3,12 +3,23 @@ package userfield
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/iflyelf/flyiam/internal/model"
+	"github.com/lib/pq"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
+
+// isUniqueViolation 判断是否为 PostgreSQL 唯一约束冲突（23505）
+func isUniqueViolation(err error) bool {
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) {
+		return pqErr.Code == "23505"
+	}
+	return strings.Contains(err.Error(), "duplicate key")
+}
 
 // Logic 用户字段定义业务逻辑
 type Logic struct {
@@ -73,6 +84,9 @@ func (l *Logic) Create(ctx context.Context, d *model.UserFieldDef) (int64, error
 		d.FieldKey, d.Label, d.FieldType, d.Options, d.ShowInList, d.ShowInForm, d.Editable, d.SortOrder,
 	)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return 0, fmt.Errorf("字段键「%s」已存在，请换一个（字段键需全局唯一）", d.FieldKey)
+		}
 		return 0, fmt.Errorf("新增字段定义失败: %w", err)
 	}
 	return id, nil
@@ -100,6 +114,9 @@ func (l *Logic) Update(ctx context.Context, d *model.UserFieldDef) error {
 	if _, err := l.db.ExecCtx(ctx, query,
 		d.FieldKey, d.Label, d.FieldType, d.Options, d.ShowInList, d.ShowInForm, d.Editable, d.SortOrder, d.ID,
 	); err != nil {
+		if isUniqueViolation(err) {
+			return fmt.Errorf("字段键「%s」已被其他字段占用，请换一个", d.FieldKey)
+		}
 		return fmt.Errorf("更新字段定义失败: %w", err)
 	}
 	return nil

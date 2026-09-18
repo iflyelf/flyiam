@@ -83,6 +83,25 @@ helmfile -f helmfile.yaml.gotmpl sync
    - 证书：`cert-built-in`
 3. **用户**：在 `flyiam` 组织下创建用户（或由数据源同步自动创建）。
 
+## 3.0 登录限制：仅管理员可登录
+
+FlyIAM 是管理后台，**只有管理员可以使用**。OAuth 回调阶段即校验，
+非管理员即使通过 Casdoor 认证也会被拒绝，并返回「无权访问」提示页。
+
+管理员判定（满足其一）：
+
+1. Casdoor 中该用户被标记为管理员（`isAdmin`）；
+2. 用户名在配置的超级管理员名单（`PERMISSION_ADMIN_USERS`，默认 `["admin"]`）。
+
+被拒绝时会记录日志：
+
+```
+🚫 拒绝非管理员登录: zhangsan（仅管理员可访问本系统）
+```
+
+> 注意：这与 **Consul Manager 不同**——Consul Manager 允许普通用户登录
+> （仅「用户/团队/角色」等管理页面需要管理员），FlyIAM 则是整体仅管理员可登录。
+
 ## 3.1 权限模型：应用 / 组织管理需内置应用凭据
 
 Casdoor 的 API 授权中，**只有 `built-in` 组织的身份是全局管理员**

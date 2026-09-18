@@ -17,6 +17,7 @@ type userPayload struct {
 	DomainAccount   string `json:"domainAccount"`
 	EmployeeCode    string `json:"employeeCode"`
 	Name            string `json:"name"`
+	Avatar          string `json:"avatar"`
 	Phone           string `json:"phone"`
 	WorkEmail       string `json:"workEmail"`
 	CompileType     string `json:"compileType"`
@@ -297,6 +298,7 @@ func buildNewUser(svcCtx *svc.ServiceContext, p *userPayload) *casdoorsdk.User {
 		Owner:             svcCtx.Config.Casdoor.OrganizationName,
 		Name:              p.DomainAccount,
 		DisplayName:       p.Name,
+		Avatar:            p.Avatar,
 		Email:             p.WorkEmail,
 		Phone:             p.Phone,
 		CountryCode:       svcCtx.Config.Casdoor.CountryCode,
@@ -313,6 +315,7 @@ func buildNewUser(svcCtx *svc.ServiceContext, p *userPayload) *casdoorsdk.User {
 // applyUserPayload 将入参应用到现有用户
 func applyUserPayload(svcCtx *svc.ServiceContext, u *casdoorsdk.User, p *userPayload) {
 	u.DisplayName = p.Name
+	u.Avatar = p.Avatar
 	u.Email = p.WorkEmail
 	u.Phone = p.Phone
 	u.CountryCode = svcCtx.Config.Casdoor.CountryCode

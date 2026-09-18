@@ -1,0 +1,1 @@
+import{i as r}from"./index-DEGTGUsX.js";function t(){return r.get("/api/user-fields")}function u(e){return r.post("/api/user-fields",e)}function d(e,s){return r.put(`/api/user-fields/${e}`,s)}function l(e){return r.delete(`/api/user-fields/${e}`)}export{u as c,l as d,t as l,d as u};

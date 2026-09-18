@@ -90,6 +90,38 @@ const router = createRouter({
   routes
 })
 
+// 动态导入（懒加载 chunk）失败处理
+//
+// 场景：发版后旧页面仍引用已删除的旧 hash chunk，服务端返回 404/HTML，
+// 浏览器报 "Failed to fetch dynamically imported module"。
+// 处理：本地标记 + 强制刷新一次，让浏览器重新获取最新 index.html 与 chunk。
+const CHUNK_RELOAD_KEY = 'flyiam:chunk-reloaded'
+const isChunkLoadError = (err) => {
+  const msg = String(err?.message || err || '')
+  return (
+    msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes('Importing a module script failed') ||
+    msg.includes('error loading dynamically imported module') ||
+    err?.name === 'ChunkLoadError'
+  )
+}
+const reloadOnce = () => {
+  if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) {
+    // 已刷新过仍失败，避免死循环
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY)
+    return
+  }
+  sessionStorage.setItem(CHUNK_RELOAD_KEY, '1')
+  window.location.reload()
+}
+router.onError((err) => {
+  if (isChunkLoadError(err)) reloadOnce()
+})
+// Vite 预加载资源失败事件
+window.addEventListener('vite:preloadError', () => reloadOnce())
+// 首次加载成功后清除标记，使下次发版仍能自动刷新
+window.addEventListener('load', () => sessionStorage.removeItem(CHUNK_RELOAD_KEY))
+
 // 路由守卫
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()

@@ -86,6 +86,15 @@ func CallbackHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 
+		// 仅管理员可登录本系统：普通用户即使通过 Casdoor 认证也拒绝进入。
+		// 管理员判定：Casdoor 管理员标记，或配置的超级管理员名单（ADMIN_USERS）。
+		if !isAdminUser(svcCtx, claims) {
+			log.Printf("🚫 拒绝非管理员登录: %s（仅管理员可访问本系统）", claims.Name)
+			denyLogin(w, r, "无权访问",
+				fmt.Sprintf("账号「%s」不是本系统管理员，无法登录。请联系管理员开通权限。", claims.DisplayName))
+			return
+		}
+
 		// 签发本地 JWT
 		localToken, err := signLocalToken(svcCtx, claims)
 		if err != nil {
@@ -98,6 +107,38 @@ func CallbackHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			localToken, claims.Name, claims.DisplayName, claims.Email)
 		http.Redirect(w, r, target, http.StatusFound)
 	}
+}
+
+// isAdminUser 判断 Casdoor 用户是否为本系统管理员。
+//
+// 规则（满足其一即可）：
+//  1. Casdoor 中该用户被标记为管理员（claims.IsAdmin）；
+//  2. 用户名在配置的超级管理员名单（Permission.AdminUsers，默认 ["admin"]）。
+func isAdminUser(svcCtx *svc.ServiceContext, claims *casdoor.Claims) bool {
+	if claims == nil {
+		return false
+	}
+	if claims.IsAdmin {
+		return true
+	}
+	logic := rbac.NewLogic(svcCtx.DB, svcCtx.Config.Permission.AdminUsers)
+	return logic.IsSuperAdmin(claims.Name)
+}
+
+// denyLogin 拒绝登录：浏览器跳转场景返回可读的提示页（非 JSON）
+func denyLogin(w http.ResponseWriter, r *http.Request, title, message string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusForbidden)
+	_, _ = fmt.Fprintf(w, `<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="utf-8"><title>%s</title>
+<style>body{font-family:system-ui,-apple-system,sans-serif;background:#f5f5f5;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+.box{background:#fff;padding:40px 48px;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.08);text-align:center;max-width:420px}
+h1{font-size:20px;margin:0 0 12px;color:#c0392b}p{color:#555;line-height:1.7;margin:0 0 20px}
+a{display:inline-block;padding:8px 20px;background:#2f6fed;color:#fff;text-decoration:none;border-radius:8px}</style>
+</head>
+<body><div class="box"><h1>%s</h1><p>%s</p><a href="/login">返回登录</a></div></body>
+</html>`, title, title, message)
 }
 
 // UserInfoHandler 返回当前登录用户信息（含有效权限列表）
@@ -118,6 +159,12 @@ func UserInfoHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		isAdmin, _ := claims["isAdmin"].(bool)
 		logic := rbac.NewLogic(svcCtx.DB, svcCtx.Config.Permission.AdminUsers)
 		isSuperAdmin := isAdmin || logic.IsSuperAdmin(username)
+
+		// 防御：历史签发的非管理员 Token 在过期前仍可能被使用，此处再次拦截
+		if !isSuperAdmin {
+			fail(w, http.StatusForbidden, "无权访问：仅管理员可使用本系统")
+			return
+		}
 
 		permissions := []string{}
 		if isSuperAdmin {
