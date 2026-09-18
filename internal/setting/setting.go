@@ -106,7 +106,7 @@ var Registry = []Item{
 		Get: func(c *config.Config) string { return c.JWT.Issuer },
 		Set: func(c *config.Config, v string) { c.JWT.Issuer = v }},
 
-	// Casdoor 连接（改动后建议重启以重建客户端）
+	// Casdoor 连接（保存后自动热重载客户端，无需重启）
 	{Key: "casdoor.endpoint", Group: "Casdoor 连接", Label: "后端地址", Type: "string",
 		Get: func(c *config.Config) string { return c.Casdoor.Endpoint },
 		Set: func(c *config.Config, v string) { c.Casdoor.Endpoint = v }},
