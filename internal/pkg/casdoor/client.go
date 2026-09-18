@@ -583,6 +583,48 @@ func (c *Client) GetUsersByOrg() ([]*casdoorsdk.User, error) {
 	return out, nil
 }
 
+// usersPageSize 分页遍历默认页大小
+const usersPageSize = 200
+
+// IterateUsersByOrg 分页遍历本组织全部用户，逐页回调，避免一次性全量加载。
+//
+// 背景（重要）：SDK 的 GetUsers()（无分页）会把整个响应先 json.Unmarshal 进
+// Response.Data(interface{})（3 万+ 用户被解析成泛型 map/slice），再二次序列化
+// 后反序列化为结构体；内存峰值数倍于数据本身，大组织同步时会把进程撑爆（OOM）。
+// 分页后每页内存有界，峰值与页大小成正比，而非与用户总数成正比。
+func (c *Client) IterateUsersByOrg(pageSize int, fn func([]*casdoorsdk.User) error) error {
+	if pageSize <= 0 || pageSize > 1000 {
+		pageSize = usersPageSize
+	}
+	page := 1
+	for {
+		users, total, err := c.bizSDK.GetPaginationUsers(page, pageSize, map[string]string{})
+		if err != nil {
+			return err
+		}
+		if len(users) > 0 {
+			if err := fn(users); err != nil {
+				return err
+			}
+		}
+		if !hasMoreUsersPage(page, pageSize, total, len(users)) {
+			return nil
+		}
+		page++
+	}
+}
+
+// hasMoreUsersPage 判断分页遍历是否应继续。
+//
+// 终止条件：本页无数据，或已取满 total。抽出为纯函数便于单测，
+// 避免分页边界（total=0、末页不足一页、total 偏小）处理出错导致死循环。
+func hasMoreUsersPage(page, pageSize, total, got int) bool {
+	if got == 0 {
+		return false
+	}
+	return page*pageSize < total
+}
+
 // GetUsersByOrgCached 按组织获取用户（带内存缓存，降低全量查询压力）
 func (c *Client) GetUsersByOrgCached() ([]*casdoorsdk.User, error) {
 	ttl := time.Duration(c.config.UserCacheTTL) * time.Second

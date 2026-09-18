@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -64,12 +65,21 @@ func NewSyncLogic(db sqlx.SqlConn, casdoorClient *casdoor.Client, datasourceLogi
 }
 
 // SyncFromDataSources 从数据源同步用户到 Casdoor
-func (l *SyncLogic) SyncFromDataSources(ctx context.Context, opts SyncOptions, triggeredBy string) error {
+func (l *SyncLogic) SyncFromDataSources(ctx context.Context, opts SyncOptions, triggeredBy string) (err error) {
 	// 并发保护：同一时刻仅允许一个同步任务
 	if !tryAcquire() {
 		return ErrSyncRunning
 	}
 	defer release()
+
+	// panic 兜底：同步在后台 goroutine 中执行，任何 panic 默认会终止整个进程。
+	// 此处捕获并记录堆栈，保证「同步失败」不会拖垮服务。
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("💥 同步任务 panic（已恢复，进程不受影响）: %v\n%s", r, debug.Stack())
+			err = fmt.Errorf("同步任务异常终止: %v", r)
+		}
+	}()
 
 	startTime := time.Now()
 	log.Println("🔄 开始从数据源同步用户到 Casdoor...")
@@ -123,15 +133,27 @@ func (l *SyncLogic) SyncFromDataSources(ctx context.Context, opts SyncOptions, t
 	// 运行中即写入总数，便于页面展示进度
 	l.updateSyncProgress(ctx, syncLogID, len(syncUsers), 0)
 
-	// 2. 读取 Casdoor 现有用户（实时，确保删除判断准确）
-	existingList, err := l.casdoorClient.GetUsersByOrg()
+	// 2. 分页读取 Casdoor 现有用户（避免全量加载导致内存暴涨/OOM）。
+	//
+	// 说明：只保留「数据源中仍存在」的用户用于增量更新；数据源中已不存在的
+	// 用户直接进入待删除列表，不再整体驻留内存。
+	existingMap := make(map[string]*casdoorsdk.User)
+	toDelete := make([]string, 0)
+	err = l.casdoorClient.IterateUsersByOrg(0, func(batch []*casdoorsdk.User) error {
+		for _, u := range batch {
+			if _, ok := seen[u.Name]; ok {
+				existingMap[u.Name] = u
+				continue
+			}
+			if opts.DeleteMissing && !l.casdoorClient.IsProtected(u.Name) {
+				toDelete = append(toDelete, u.Name)
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		l.finishSyncLog(ctx, syncLogID, "failed", sourceTotal, 0, 0, 0, "读取 Casdoor 用户失败: "+err.Error(), time.Since(startTime), nil)
 		return fmt.Errorf("读取 Casdoor 用户失败: %w", err)
-	}
-	existingMap := make(map[string]*casdoorsdk.User, len(existingList))
-	for _, u := range existingList {
-		existingMap[u.Name] = u
 	}
 
 	// 3. 并发新增/更新到 Casdoor（周期性上报进度）
@@ -143,22 +165,10 @@ func (l *SyncLogic) SyncFromDataSources(ctx context.Context, opts SyncOptions, t
 	// 4. 删除数据源中不存在的人员（跳过受保护用户）
 	deleted := 0
 	var deletedNames []string
-	if opts.DeleteMissing {
-		toDelete := make([]string, 0)
-		for _, u := range existingList {
-			if _, ok := seen[u.Name]; ok {
-				continue
-			}
-			if l.casdoorClient.IsProtected(u.Name) {
-				continue
-			}
-			toDelete = append(toDelete, u.Name)
-		}
-		if len(toDelete) > 0 {
-			deleted = l.deleteUsers(ctx, toDelete, opts.Concurrency)
-			deletedNames = toDelete
-			log.Printf("🗑️  已从 Casdoor 删除 %d 名不存在于数据源的用户", deleted)
-		}
+	if opts.DeleteMissing && len(toDelete) > 0 {
+		deleted = l.deleteUsers(ctx, toDelete, opts.Concurrency)
+		deletedNames = toDelete
+		log.Printf("🗑️  已从 Casdoor 删除 %d 名不存在于数据源的用户", deleted)
 	}
 
 	// 同步后使缓存失效

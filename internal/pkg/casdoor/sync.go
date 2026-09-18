@@ -132,7 +132,6 @@ func (c *Client) BatchSync(ctx context.Context, users []SyncUser, existing map[s
 			}
 
 			mu.Lock()
-			defer mu.Unlock()
 			if err != nil {
 				result.Failed++
 				if len(result.Errors) < 50 {
@@ -147,10 +146,15 @@ func (c *Client) BatchSync(ctx context.Context, users []SyncUser, existing map[s
 				}
 				result.SuccessNames[u.DomainAccount] = struct{}{}
 			}
-
 			done := result.Success + result.Failed
-			if progress != nil && (done%progressStep == 0 || done == result.Total) {
-				progress(done, result.Total)
+			total := result.Total
+			shouldReport := progress != nil && (done%progressStep == 0 || done == total)
+			mu.Unlock()
+
+			// 进度回调放到锁外执行：其内部会写数据库（阻塞 IO），
+			// 持锁回调会串行化所有 worker 并放大锁竞争。
+			if shouldReport {
+				progress(done, total)
 			}
 		}(u)
 	}
