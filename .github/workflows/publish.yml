@@ -261,6 +261,39 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # 华为云 SWR 镜像仓库默认私有，push 后调用 SWR API 设为公开
+      # 需 Secrets: SWR_AK / SWR_SK（华为云账号 AK/SK，具备 swr:repo:updateRepo 权限）
+      - name: 设置 SWR 镜像为公开
+        if: ${{ secrets.SWR_AK != '' && secrets.SWR_SK != '' }}
+        env:
+          CLOUD_SDK_AK: ${{ secrets.SWR_AK }}
+          CLOUD_SDK_SK: ${{ secrets.SWR_SK }}
+          SWR_REGION: cn-east-3
+          SWR_ORGANIZATION: ${{ env.SWR_ORGANIZATION }}
+        run: |
+          pip install --quiet huaweicloudsdkcore huaweicloudsdkswr
+          python - <<'PY'
+          import os
+          from huaweicloudsdkcore.auth.credentials import BasicCredentials
+          from huaweicloudsdkswr.v2.region.swr_region import SwrRegion
+          from huaweicloudsdkswr.v2 import SwrClient
+          from huaweicloudsdkswr.v2.model import UpdateRepoRequest, UpdateRepoRequestBody
+
+          client = SwrClient.new_builder() \
+              .with_credentials(BasicCredentials(os.environ["CLOUD_SDK_AK"], os.environ["CLOUD_SDK_SK"])) \
+              .with_region(SwrRegion.value_of(os.environ["SWR_REGION"])) \
+              .build()
+
+          namespace = os.environ["SWR_ORGANIZATION"]
+          for repository in ["flyiam"]:
+              req = UpdateRepoRequest()
+              req.namespace = namespace
+              req.repository = repository
+              req.body = UpdateRepoRequestBody(is_public=True)
+              client.update_repo(req)
+              print(f"✅ 已设为公开: {namespace}/{repository}")
+          PY
+
       - name: 清理旧的 workflow 运行记录
         uses: Mattraks/delete-workflow-runs@main
         with:
