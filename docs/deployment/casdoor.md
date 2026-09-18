@@ -91,7 +91,20 @@ FlyIAM 是管理后台，**只有管理员可以使用**。OAuth 回调阶段即
 管理员判定（满足其一）：
 
 1. Casdoor 中该用户被标记为管理员（`isAdmin`）；
-2. 用户名在配置的超级管理员名单（`PERMISSION_ADMIN_USERS`，默认 `["admin"]`）。
+2. 用户名在配置的超级管理员名单（`PERMISSION_ADMIN_USERS`，无代码内默认值）。
+
+Helm 部署时可通过以下变量配置（逗号分隔）：
+
+| 变量 | 说明 | 默认 |
+|------|------|------|
+| `FLYIAM_PERMISSION_ADMIN_USERS` | 超级管理员名单 | 空（仅依赖 Casdoor `isAdmin`） |
+| `FLYIAM_CASDOOR_PROTECTED_USERS` | 受保护用户（同步/删除时跳过） | 空（`<组织>/admin` 程序内始终受保护） |
+
+```bash
+export FLYIAM_PERMISSION_ADMIN_USERS="junwang66,admin"
+export FLYIAM_CASDOOR_PROTECTED_USERS="junwang66"
+helmfile sync
+```
 
 被拒绝时会记录日志：
 

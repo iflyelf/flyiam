@@ -116,6 +116,8 @@ releases:
       - casdoorOrganizationName: {{ .Values.casdoorOrganizationName | quote }}
       - casdoorApplicationName: {{ .Values.casdoorApplicationName | quote }}
       - casdoorAllowedRedirectHosts: {{ .Values.casdoorAllowedRedirectHosts | quote }}
+      - casdoorProtectedUsers: {{ .Values.casdoorProtectedUsers | quote }}
+      - permissionAdminUsers: {{ .Values.permissionAdminUsers | quote }}
       # HPA 配置
       - hpaEnabled: {{ .Values.hpaEnabled }}
       - hpaMinReplicas: {{ .Values.hpaMinReplicas }}

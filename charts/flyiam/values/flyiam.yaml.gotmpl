@@ -235,6 +235,14 @@ env:
   - name: CASDOOR_ALLOWED_REDIRECT_HOSTS
     value: {{ .Values.casdoorAllowedRedirectHosts | quote }}
   {{- end }}
+  {{- if .Values.casdoorProtectedUsers }}
+  - name: CASDOOR_PROTECTED_USERS
+    value: {{ .Values.casdoorProtectedUsers | quote }}
+  {{- end }}
+  {{- if .Values.permissionAdminUsers }}
+  - name: PERMISSION_ADMIN_USERS
+    value: {{ .Values.permissionAdminUsers | quote }}
+  {{- end }}
   - name: CASDOOR_COUNTRY_CODE
     value: {{ .Values.casdoorCountryCode | quote }}
   - name: CASDOOR_AUTO_SETUP

@@ -105,7 +105,10 @@ charts/flyiam/
 | `FLYIAM_CASDOOR_ENDPOINT` | Casdoor 后端地址（集群内） | `http://casdoor:8000` |
 | `FLYIAM_CASDOOR_PUBLIC_ENDPOINT` | Casdoor 浏览器地址（外置域名，标准端口 80/443） | - |
 | `FLYIAM_CASDOOR_AUTO_SETUP` | 自动初始化 Casdoor | `true` |
-| `FLYIAM_CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码 | `ysyh!9Sky` |
+| `FLYIAM_CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码（生产必须覆盖） | `ysyh!9Sky` |
+| `FLYIAM_PERMISSION_ADMIN_USERS` | 超级管理员名单（逗号分隔） | 空（依赖 Casdoor `isAdmin`） |
+| `FLYIAM_CASDOOR_PROTECTED_USERS` | 受保护用户（逗号分隔，同步/删除时跳过） | 空（`<组织>/admin` 始终受保护） |
+| `FLYIAM_CASDOOR_ALLOWED_REDIRECT_HOSTS` | 回调地址主机白名单（逗号分隔） | 空 |
 | `CASDOOR_ENABLED` | 部署内置 Casdoor | `true` |
 | `CASDOOR_REPLICAS` | Casdoor 副本数 | `2` |
 | `CASDOOR_REDIS_SESSION_ENABLED` | Casdoor 会话是否用 Redis 共享（多副本必须开启） | 跟随 `FLYIAM_REDIS_ENABLED`（默认 `true`） |

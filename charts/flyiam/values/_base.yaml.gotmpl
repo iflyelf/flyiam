@@ -156,6 +156,12 @@ casdoorDefaultPassword: '{{ env "FLYIAM_CASDOOR_DEFAULT_PASSWORD" | default "ysy
 # 允许自动追加回调地址的主机白名单（逗号分隔）。
 # 非空时仅允许这些主机的回调自动写入 Casdoor，防止 Host 头伪造（开放重定向）。
 casdoorAllowedRedirectHosts: '{{ env "FLYIAM_CASDOOR_ALLOWED_REDIRECT_HOSTS" | default "" }}'
+# 受保护用户（域账号，逗号分隔）：同步与删除时跳过，防止误删。
+# 内置管理员账号（<组织>/admin）程序内始终受保护，无需在此重复。
+casdoorProtectedUsers: '{{ env "FLYIAM_CASDOOR_PROTECTED_USERS" | default "" }}'
+# 超级管理员名单（域账号，逗号分隔）。
+# 留空时不额外指定：Casdoor 中标记为管理员的账号（isAdmin）即为超级管理员。
+permissionAdminUsers: '{{ env "FLYIAM_PERMISSION_ADMIN_USERS" | default "" }}'
 # 手机号区域
 casdoorCountryCode: '{{ env "FLYIAM_CASDOOR_COUNTRY_CODE" | default "CN" }}'
 # 启动时自动初始化 Casdoor（组织/应用/管理员）
