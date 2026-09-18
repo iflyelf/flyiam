@@ -260,6 +260,15 @@ Unauthorized operation
 | 自动初始化 | `FLYIAM_CASDOOR_AUTO_SETUP` | `true` |
 | 自动追加回调 | `FLYIAM_CASDOOR_AUTO_REDIRECT_URI` | `true` |
 
+> **配置来源（DB 优先 / env 兜底）**：上表除 `CASDOOR_AUTO_SETUP` 外均可经
+> 「系统设置 → Casdoor 连接」页面配置（存 `app_settings` 表）。
+> 启动时先 `settings.Load` 合并数据库配置，**之后**才执行 `ValidateCasdoor`
+> 校验 Casdoor 连接，因此：
+> - 已有页面配置的实例可**去掉** `CASDOOR_*` 环境变量，仅靠数据库启动；
+> - 全新部署若 env 为空，会因无法读取/创建业务应用而在校验阶段退出
+>   （`CASDOOR_AUTO_SETUP=true` 时应用凭据可留空，由程序自动创建）。
+> 校验失败信息会明确提示「在「系统设置」页面配置」。
+
 ## 5. 数据库约定
 
 Casdoor 与 FlyIAM **共用同一 PostgreSQL 数据库**，Casdoor 表统一前缀 `casdoor_`。

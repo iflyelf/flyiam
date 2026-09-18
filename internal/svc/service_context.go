@@ -84,6 +84,12 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 		log.Printf("⚠️ 加载应用设置失败（将使用环境变量默认值）: %v", err)
 	}
 
+	// Casdoor 连接配置校验须在 settings.Load 之后：
+	// 这些字段可由「系统设置」页面（数据库）提供，此时已合并 DB 值。
+	if err := c.ValidateCasdoor(); err != nil {
+		log.Fatalf("❌ Casdoor 配置校验失败: %v", err)
+	}
+
 	// 初始化 Casdoor 客户端（含自动初始化组织/应用/管理员）
 	casdoorClient, err := initCasdoorClient(db, *c)
 	if err != nil {

@@ -121,6 +121,8 @@ charts/flyiam/
 > `_ORGANIZATION` / `_APPLICATION` / `_CERTIFICATE` / `_DEFAULT_PASSWORD` /
 > `_AUTO_SETUP`，以及内置 Casdoor 部署参数（`CASDOOR_*`）。
 > 原因：登录、首次自动初始化与启动校验依赖它们，且登录前无法访问设置页。
+> 启动时先加载数据库页面设置、**之后**才校验 Casdoor 连接，因此
+> **已有 `app_settings` 记录的实例可去掉 `CASDOOR_*` 环境变量**，仅靠数据库启动。
 >
 > **页面可配置（已从 Chart 移除）**：安全/跨域、审计、权限、日志、JWT 过期/签发者、
 > 管理员用户名/邮箱、服务间调用令牌等，均存于数据库

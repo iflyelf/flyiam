@@ -210,7 +210,10 @@ func splitAndTrim(s string) []string {
 	return out
 }
 
-// Validate 验证配置
+// Validate 验证启动前置配置（不依赖数据库中的页面设置）。
+//
+// 说明：Casdoor 连接类配置可由「系统设置」页面（存 app_settings 表）提供，
+// 需在 settings.Load 之后才能读到，故由 ValidateCasdoor 单独校验。
 func (c *Config) Validate() error {
 	// 验证数据库配置
 	if c.Database.DSN == "" && c.Database.Host == "" {
@@ -230,19 +233,26 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("管理员密码未设置: 请设置 ADMIN_PASSWORD 环境变量")
 	}
 
-	// 验证 Casdoor 配置
+	return nil
+}
+
+// ValidateCasdoor 校验 Casdoor 连接配置。
+//
+// 必须在 settings.Load 之后调用：这些字段可由「系统设置」页面（数据库）配置，
+// 此时内存配置已合并 DB 值（DB 优先 / env 兜底）。
+func (c *Config) ValidateCasdoor() error {
 	if c.Casdoor.Endpoint == "" {
-		return fmt.Errorf("Casdoor 端点未设置: 请设置 CASDOOR_ENDPOINT 环境变量")
+		return fmt.Errorf("Casdoor 端点未设置: 请设置 CASDOOR_ENDPOINT 环境变量或在「系统设置」页面配置")
 	}
 	if c.Casdoor.DefaultPassword == "" {
-		return fmt.Errorf("Casdoor 默认密码未设置: 请设置 CASDOOR_DEFAULT_PASSWORD 环境变量或 Secret（不再提供弱口令默认值）")
+		return fmt.Errorf("Casdoor 默认密码未设置: 请设置 CASDOOR_DEFAULT_PASSWORD 环境变量/Secret，或在「系统设置」页面配置")
 	}
 	// 应用凭据：
 	//   - 开启 AutoSetup（默认）时可留空，由程序在启动时从内置应用读取/创建业务应用
 	//     并回填凭据（见 svc.buildCasdoorClient → casdoor.EnsureSetup）；
 	//   - 关闭 AutoSetup 时必须显式提供，否则无法建立客户端。
 	if !c.Casdoor.AutoSetup && (c.Casdoor.ClientId == "" || c.Casdoor.ClientSecret == "") {
-		return fmt.Errorf("Casdoor 应用凭据未设置: 请设置 CASDOOR_CLIENT_ID / CASDOOR_CLIENT_SECRET，或开启 CASDOOR_AUTO_SETUP 自动创建")
+		return fmt.Errorf("Casdoor 应用凭据未设置: 请设置 CASDOOR_CLIENT_ID / CASDOOR_CLIENT_SECRET，开启 CASDOOR_AUTO_SETUP 自动创建，或在「系统设置」页面配置")
 	}
 
 	return nil
