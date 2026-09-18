@@ -11,7 +11,10 @@ import (
 	"github.com/iflyelf/flyiam/internal/svc"
 )
 
-// syncOptions 从定时配置读取同步选项（手动与定时保持一致）
+// syncOptions 解析同步选项。
+//
+// 并发度优先取 URL 显式参数 ?batchSize（API 声明的入参），未提供时回退到
+// 「定时任务」页面配置的 casdoor_batch_size。两者都无效时用默认 10。
 func syncOptions(svcCtx *svc.ServiceContext, r *http.Request) synclogic.SyncOptions {
 	opts := synclogic.SyncOptions{DeleteMissing: true, Concurrency: 10}
 	if cfg, err := schedule.NewLogic(svcCtx.DB).Get(r.Context()); err == nil {
@@ -19,6 +22,10 @@ func syncOptions(svcCtx *svc.ServiceContext, r *http.Request) synclogic.SyncOpti
 		if cfg.CasdoorBatchSize > 0 {
 			opts.Concurrency = cfg.CasdoorBatchSize
 		}
+	}
+	// URL 显式指定时以其为准（如 ?batchSize=50）
+	if bs := atoiDefault(r.URL.Query().Get("batchSize"), 0); bs > 0 {
+		opts.Concurrency = bs
 	}
 	return opts
 }
