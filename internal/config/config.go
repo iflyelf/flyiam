@@ -134,32 +134,12 @@ type Config struct {
 		AdminUsers  []string `json:",optional"`
 	}
 
-	DataSources struct {
-		HttpApi HttpApiDataSourceConfig `json:",optional"`
-	}
-
 	CasdoorSync struct {
 		Enabled                 bool `json:",default=true,env=CASDOOR_SYNC_ENABLED"`
 		AutoSyncAfterDataSource bool `json:",default=true,env=CASDOOR_SYNC_AUTO"`
 		BatchSize               int  `json:",default=50,env=CASDOOR_SYNC_BATCH_SIZE"`
 		RetryTimes              int  `json:",default=3,env=CASDOOR_SYNC_RETRY_TIMES"`
 		RetryInterval           int  `json:",default=5,env=CASDOOR_SYNC_RETRY_INTERVAL"` // seconds
-	}
-}
-
-// HttpApiDataSourceConfig HTTP API 数据源配置
-type HttpApiDataSourceConfig struct {
-	Enabled           bool   `json:",default=false,env=DATASOURCE_HTTPAPI_ENABLED"`
-	URL               string `json:",optional,env=DATASOURCE_HTTPAPI_URL"`
-	Timeout           int    `json:",default=30,env=DATASOURCE_HTTPAPI_TIMEOUT"`
-	SyncInterval      string `json:",default=6h,env=DATASOURCE_HTTPAPI_SYNC_INTERVAL"`
-	AutoSyncOnStartup bool   `json:",default=true,env=DATASOURCE_HTTPAPI_AUTO_SYNC"`
-	Priority          int    `json:",default=90,env=DATASOURCE_HTTPAPI_PRIORITY"`
-	Auth              struct {
-		Type     string `json:",default=bearer,env=DATASOURCE_HTTPAPI_AUTH_TYPE"`
-		Token    string `json:",optional,env=DATASOURCE_HTTPAPI_AUTH_TOKEN"`
-		Username string `json:",optional,env=DATASOURCE_HTTPAPI_AUTH_USERNAME"`
-		Password string `json:",optional,env=DATASOURCE_HTTPAPI_AUTH_PASSWORD"`
 	}
 }
 

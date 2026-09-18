@@ -107,10 +107,10 @@ var Registry = []Item{
 		Set: func(c *config.Config, v string) { c.JWT.Issuer = v }},
 
 	// Casdoor 连接（改动后建议重启以重建客户端）
-	{Key: "casdoor.endpoint", Group: "Casdoor 连接", Label: "后端地址（重启生效）", Type: "string",
+	{Key: "casdoor.endpoint", Group: "Casdoor 连接", Label: "后端地址", Type: "string",
 		Get: func(c *config.Config) string { return c.Casdoor.Endpoint },
 		Set: func(c *config.Config, v string) { c.Casdoor.Endpoint = v }},
-	{Key: "casdoor.public_endpoint", Group: "Casdoor 连接", Label: "浏览器地址（重启生效）", Type: "string",
+	{Key: "casdoor.public_endpoint", Group: "Casdoor 连接", Label: "浏览器地址", Type: "string",
 		Get: func(c *config.Config) string { return c.Casdoor.PublicEndpoint },
 		Set: func(c *config.Config, v string) { c.Casdoor.PublicEndpoint = v }},
 	{Key: "casdoor.organization", Group: "Casdoor 连接", Label: "组织名", Type: "string",
@@ -122,10 +122,10 @@ var Registry = []Item{
 	{Key: "casdoor.certificate", Group: "Casdoor 连接", Label: "证书名", Type: "string",
 		Get: func(c *config.Config) string { return c.Casdoor.Certificate },
 		Set: func(c *config.Config, v string) { c.Casdoor.Certificate = v }},
-	{Key: "casdoor.client_id", Group: "Casdoor 连接", Label: "Client ID（重启生效）", Type: "string",
+	{Key: "casdoor.client_id", Group: "Casdoor 连接", Label: "Client ID", Type: "string",
 		Get: func(c *config.Config) string { return c.Casdoor.ClientId },
 		Set: func(c *config.Config, v string) { c.Casdoor.ClientId = v }},
-	{Key: "casdoor.client_secret", Group: "Casdoor 连接", Label: "Client Secret（重启生效）", Type: "secret", Secret: true,
+	{Key: "casdoor.client_secret", Group: "Casdoor 连接", Label: "Client Secret", Type: "secret", Secret: true,
 		Get: func(c *config.Config) string { return c.Casdoor.ClientSecret },
 		Set: func(c *config.Config, v string) { c.Casdoor.ClientSecret = v }},
 	{Key: "casdoor.user_cache_ttl", Group: "Casdoor 连接", Label: "用户缓存(秒)", Type: "int",
@@ -221,10 +221,13 @@ func (s *Service) Load(ctx context.Context) error {
 	return nil
 }
 
-// Apply 将若干设置写入 DB 并立即应用到内存 Config（无需重启）
-func (s *Service) Apply(ctx context.Context, kv map[string]string) error {
+// Apply 将若干设置写入 DB 并立即应用到内存 Config（无需重启）。
+//
+// 返回实际生效的 key 列表（供调用方判断是否需要热重载相关组件，如 Casdoor 客户端）。
+func (s *Service) Apply(ctx context.Context, kv map[string]string) ([]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	applied := make([]string, 0, len(kv))
 	for k, v := range kv {
 		it, ok := s.items[k]
 		if !ok {
@@ -234,11 +237,22 @@ func (s *Service) Apply(ctx context.Context, kv map[string]string) error {
 			`INSERT INTO app_settings (key, value, updated_at) VALUES ($1,$2,NOW())
 			 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
 			k, v); err != nil {
-			return fmt.Errorf("保存设置 %s 失败: %w", k, err)
+			return applied, fmt.Errorf("保存设置 %s 失败: %w", k, err)
 		}
 		it.Set(s.cfg, v)
+		applied = append(applied, k)
 	}
-	return nil
+	return applied, nil
+}
+
+// NeedsCasdoorReload 判断本次变更是否涉及 Casdoor 连接配置（需重建客户端）
+func NeedsCasdoorReload(applied []string) bool {
+	for _, k := range applied {
+		if strings.HasPrefix(k, "casdoor.") {
+			return true
+		}
+	}
+	return false
 }
 
 // View 返回全部可配置项（含当前值；secret 以占位符返回）

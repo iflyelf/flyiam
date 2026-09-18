@@ -169,16 +169,8 @@ casdoorAutoSetup: {{ env "FLYIAM_CASDOOR_AUTO_SETUP" | default "true" }}
 # 登录回调地址不存在时自动追加
 casdoorAutoRedirectUri: {{ env "FLYIAM_CASDOOR_AUTO_REDIRECT_URI" | default "true" }}
 
-# ==================== 数据源配置（插件式架构）====================
-# HTTP API 数据源配置
-datasourceHttpApiEnabled: {{ env "FLYIAM_DATASOURCE_HTTPAPI_ENABLED" | default "false" }}
-datasourceHttpApiUrl: '{{ env "FLYIAM_DATASOURCE_HTTPAPI_URL" | default "" }}'
-datasourceHttpApiTimeout: {{ env "FLYIAM_DATASOURCE_HTTPAPI_TIMEOUT" | default "30" }}
-datasourceHttpApiSyncInterval: '{{ env "FLYIAM_DATASOURCE_HTTPAPI_SYNC_INTERVAL" | default "6h" }}'
-datasourceHttpApiAutoSync: {{ env "FLYIAM_DATASOURCE_HTTPAPI_AUTO_SYNC" | default "true" }}
-datasourceHttpApiPriority: {{ env "FLYIAM_DATASOURCE_HTTPAPI_PRIORITY" | default "90" }}
-datasourceHttpApiAuthType: '{{ env "FLYIAM_DATASOURCE_HTTPAPI_AUTH_TYPE" | default "bearer" }}'
-datasourceHttpApiAuthToken: '{{ env "FLYIAM_DATASOURCE_HTTPAPI_AUTH_TOKEN" | default "" }}'
+# ==================== 数据源配置 ====================
+# 说明：数据源改为「页面管理」（存数据库），在「数据同步」页面配置，无需环境变量。
 
 # ==================== Casdoor 同步配置 ====================
 # 是否启用自动同步到 Casdoor

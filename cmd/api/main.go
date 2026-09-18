@@ -96,7 +96,7 @@ func main() {
 	// 启动定时任务调度器
 	schedCtx, cancelScheduler := context.WithCancel(context.Background())
 	defer cancelScheduler()
-	scheduler.New(svcCtx.DB, svcCtx.CasdoorClient).Start(schedCtx)
+	scheduler.New(svcCtx.DB, svcCtx.Casdoor).Start(schedCtx)
 
 	// 注册业务路由
 	handler.RegisterHandlers(server, svcCtx)

@@ -76,8 +76,8 @@ func isAdminUserByUsername(svcCtx *svc.ServiceContext, username string) bool {
 	if logic.IsSuperAdmin(username) {
 		return true
 	}
-	if svcCtx.CasdoorClient != nil {
-		if u, err := svcCtx.CasdoorClient.GetUser(username); err == nil && u != nil {
+	if svcCtx.Casdoor() != nil {
+		if u, err := svcCtx.Casdoor().GetUser(username); err == nil && u != nil {
 			return u.IsAdmin
 		}
 	}

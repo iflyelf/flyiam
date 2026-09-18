@@ -202,6 +202,20 @@ psql "$DATABASE_URL" -c "SELECT name FROM casdoor_application WHERE name='app-bu
 
 > 该警告**只影响应用/组织管理页面**，登录与用户管理功能不受影响。
 
+## 3.1.1 配置热重载（免重启）
+
+Casdoor 连接配置（`casdoor.endpoint` / `public_endpoint` / `organization` /
+`application` / `certificate` / `client_id` / `client_secret` 等）已支持
+**页面修改后即时生效**，无需重启 Pod：
+
+- 在「系统设置 → Casdoor 连接」修改并保存；
+- 服务端检测到 `casdoor.*` 变更后，会用最新配置**原子重建** Casdoor 客户端；
+- 定时同步、登录、用户管理等后续请求自动使用新客户端。
+
+> 内部实现：`ServiceContext` 持有 `atomic.Pointer[casdoor.Client]`，
+> 通过 `Casdoor()` 访问器读取、`ReloadCasdoor()` 重建替换，切换过程对并发请求安全。
+> 若重建失败（如地址不可达），配置已保存但旧客户端仍继续服务，页面会提示错误。
+
 ## 3.2 多副本与会话共享（重要）
 
 Casdoor 默认把登录会话保存在**本 Pod 的文件**中（`./tmp`）。内置 Casdoor 多副本

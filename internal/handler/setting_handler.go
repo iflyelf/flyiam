@@ -41,9 +41,19 @@ func UpdateSettingsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			}
 			toApply[k] = v
 		}
-		if err := svcCtx.Settings.Apply(r.Context(), toApply); err != nil {
+		applied, err := svcCtx.Settings.Apply(r.Context(), toApply)
+		if err != nil {
 			fail(w, http.StatusInternalServerError, err.Error())
 			return
+		}
+
+		// 若修改了 Casdoor 连接配置，热重载客户端（免重启）
+		if setting.NeedsCasdoorReload(applied) {
+			if err := svcCtx.ReloadCasdoor(r.Context()); err != nil {
+				// 保存已成功，但重建失败：提示用户（旧客户端仍可用）
+				fail(w, http.StatusBadGateway, "配置已保存，但 Casdoor 客户端重建失败: "+err.Error())
+				return
+			}
 		}
 		ok(w, nil)
 	}

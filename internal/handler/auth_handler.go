@@ -54,7 +54,7 @@ func requestBaseURL(r *http.Request) string {
 // LoginHandler 跳转 Casdoor 登录（OAuth2 授权码模式）
 func LoginHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if svcCtx.CasdoorClient == nil {
+		if svcCtx.Casdoor() == nil {
 			fail(w, http.StatusInternalServerError, "Casdoor 未初始化")
 			return
 		}
@@ -62,7 +62,7 @@ func LoginHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 
 		// 回调地址不存在于应用白名单时自动追加，避免登录报
 		// "Redirect URI doesn't exist in the allowed Redirect URI list"
-		if changed, err := svcCtx.CasdoorClient.EnsureRedirectURI(redirectUri); err != nil {
+		if changed, err := svcCtx.Casdoor().EnsureRedirectURI(redirectUri); err != nil {
 			log.Printf("⚠️ 自动追加回调地址失败: %v", err)
 		} else if changed {
 			log.Printf("✅ 已自动追加回调地址到应用白名单: %s", redirectUri)
@@ -73,7 +73,7 @@ func LoginHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		state := randomState()
 		http.SetCookie(w, cookieCfg.NewAuthCookie(oauthStateCookie, state, 600, r))
 
-		loginURL := svcCtx.CasdoorClient.GetSigninUrl(redirectUri, state)
+		loginURL := svcCtx.Casdoor().GetSigninUrl(redirectUri, state)
 
 		if r.URL.Query().Get("format") == "json" {
 			ok(w, map[string]string{"loginUrl": loginURL, "redirectUri": redirectUri})
@@ -91,7 +91,7 @@ func CallbackHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusBadRequest, "缺少授权码 code")
 			return
 		}
-		if svcCtx.CasdoorClient == nil {
+		if svcCtx.Casdoor() == nil {
 			fail(w, http.StatusInternalServerError, "Casdoor 未初始化")
 			return
 		}
@@ -106,12 +106,12 @@ func CallbackHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		// 一次性使用：校验后立即失效
 		http.SetCookie(w, &http.Cookie{Name: oauthStateCookie, Value: "", Path: "/", MaxAge: -1})
 
-		accessToken, err := svcCtx.CasdoorClient.GetOAuthToken(code, "")
+		accessToken, err := svcCtx.Casdoor().GetOAuthToken(code, "")
 		if err != nil {
 			fail(w, http.StatusBadGateway, "获取 Casdoor Token 失败: "+err.Error())
 			return
 		}
-		claims, err := svcCtx.CasdoorClient.ParseToken(accessToken)
+		claims, err := svcCtx.Casdoor().ParseToken(accessToken)
 		if err != nil {
 			fail(w, http.StatusBadGateway, "解析 Casdoor Token 失败: "+err.Error())
 			return
@@ -239,7 +239,7 @@ func UserInfoHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 // ChangePasswordHandler 当前用户修改自己的密码（需校验原密码）
 func ChangePasswordHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if svcCtx.CasdoorClient == nil {
+		if svcCtx.Casdoor() == nil {
 			fail(w, http.StatusServiceUnavailable, "Casdoor 未初始化")
 			return
 		}
@@ -260,7 +260,7 @@ func ChangePasswordHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusBadRequest, "新密码不能为空")
 			return
 		}
-		if okPwd, err := svcCtx.CasdoorClient.SetUserPassword(username, req.OldPassword, req.NewPassword); err != nil || !okPwd {
+		if okPwd, err := svcCtx.Casdoor().SetUserPassword(username, req.OldPassword, req.NewPassword); err != nil || !okPwd {
 			msg := "修改密码失败，请检查原密码是否正确"
 			if err != nil {
 				msg += ": " + friendlyCasdoorErr(err.Error())

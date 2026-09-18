@@ -142,41 +142,11 @@ Permission:
   AdminUsers: []
 
 # =============================================================================
-# 数据源配置（插件式架构）
-# 
-# 说明：
-#   - 每个数据源可独立启用/禁用
-#   - 不同数据源按优先级合并用户数据
-#   - 删除某个数据源配置不影响系统运行
+# 数据源配置
+#
+# 说明：数据源已改为「页面管理」（存储于数据库 datasource_configs 表），
+#       在「数据同步」页面新增/编辑，无需在此文件配置。
 # =============================================================================
-
-# -----------------------------------------------------------------------------
-# HTTP API 数据源（示例）
-# -----------------------------------------------------------------------------
-DataSources:
-  HttpApi:
-    # 是否启用该数据源（环境变量: DATASOURCE_HTTPAPI_ENABLED）
-    Enabled: false
-    
-    # API 地址
-    URL: "http://hr-api.example.com/api/users"  # （环境变量: DATASOURCE_HTTPAPI_URL）
-    
-    # API 超时时间，单位秒
-    Timeout: 30                        # （环境变量: DATASOURCE_HTTPAPI_TIMEOUT）
-    
-    # 数据同步配置
-    SyncInterval: "6h"                 # 同步间隔（支持: 1h, 30m, 6h 等）（环境变量: DATASOURCE_HTTPAPI_SYNC_INTERVAL）
-    AutoSyncOnStartup: true            # 启动时是否自动同步（环境变量: DATASOURCE_HTTPAPI_AUTO_SYNC）
-    
-    # 数据优先级（数字越大优先级越高，用于数据去重）
-    Priority: 90                       # （环境变量: DATASOURCE_HTTPAPI_PRIORITY）
-    
-    # API 认证配置
-    Auth:
-      Type: "bearer"                   # 认证类型: bearer, basic, apikey, none
-      Token: ""                        # Bearer Token 或 API Key（环境变量: DATASOURCE_HTTPAPI_AUTH_TOKEN）
-      Username: ""                     # Basic Auth 用户名（环境变量: DATASOURCE_HTTPAPI_AUTH_USERNAME）
-      Password: ""                     # Basic Auth 密码（环境变量: DATASOURCE_HTTPAPI_AUTH_PASSWORD）
 
 # =============================================================================
 # Casdoor 同步配置

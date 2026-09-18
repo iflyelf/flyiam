@@ -69,7 +69,7 @@ func DeleteProtectedUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 // refreshProtected 重新加载受保护用户到 Casdoor 客户端
 func refreshProtected(svcCtx *svc.ServiceContext, r *http.Request) {
 	if accounts, err := svcCtx.ProtectedLogic.Accounts(r.Context()); err == nil {
-		svcCtx.CasdoorClient.SetProtected(accounts)
+		svcCtx.Casdoor().SetProtected(accounts)
 	}
 }
 
@@ -106,11 +106,11 @@ func maskApplication(app *casdoorsdk.Application) *casdoorsdk.Application {
 // ListApplicationsHandler 应用列表
 func ListApplicationsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if svcCtx.CasdoorClient == nil {
+		if svcCtx.Casdoor() == nil {
 			fail(w, http.StatusServiceUnavailable, "Casdoor 未初始化")
 			return
 		}
-		apps, err := svcCtx.CasdoorClient.ListApplications()
+		apps, err := svcCtx.Casdoor().ListApplications()
 		if err != nil {
 			fail(w, http.StatusBadGateway, err.Error())
 			return
@@ -127,7 +127,7 @@ func ListApplicationsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 func GetApplicationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := pathvar.Vars(r)["name"]
-		app, err := svcCtx.CasdoorClient.GetApplication(name)
+		app, err := svcCtx.Casdoor().GetApplication(name)
 		if err != nil || app == nil {
 			fail(w, http.StatusNotFound, "应用不存在")
 			return
@@ -162,7 +162,7 @@ func CreateApplicationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			EnableCodeSignin:    true,
 			Cert:                p.Cert,
 		}
-		if _, err := svcCtx.CasdoorClient.AddApplication(app); err != nil {
+		if _, err := svcCtx.Casdoor().AddApplication(app); err != nil {
 			fail(w, http.StatusBadGateway, err.Error())
 			return
 		}
@@ -179,7 +179,7 @@ func UpdateApplicationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusBadRequest, "参数解析失败: "+err.Error())
 			return
 		}
-		app, err := svcCtx.CasdoorClient.GetApplication(name)
+		app, err := svcCtx.Casdoor().GetApplication(name)
 		if err != nil || app == nil {
 			fail(w, http.StatusNotFound, "应用不存在")
 			return
@@ -203,7 +203,7 @@ func UpdateApplicationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		if p.RedirectUris != nil {
 			app.RedirectUris = normalizeList(p.RedirectUris)
 		}
-		if _, err := svcCtx.CasdoorClient.UpdateApplication(app); err != nil {
+		if _, err := svcCtx.Casdoor().UpdateApplication(app); err != nil {
 			fail(w, http.StatusBadGateway, err.Error())
 			return
 		}
@@ -219,7 +219,7 @@ func DeleteApplicationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusBadRequest, "缺少应用名称")
 			return
 		}
-		if _, err := svcCtx.CasdoorClient.DeleteApplication(name); err != nil {
+		if _, err := svcCtx.Casdoor().DeleteApplication(name); err != nil {
 			fail(w, http.StatusBadGateway, err.Error())
 			return
 		}
@@ -238,11 +238,11 @@ type organizationPayload struct {
 // ListOrganizationsHandler 组织列表
 func ListOrganizationsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if svcCtx.CasdoorClient == nil {
+		if svcCtx.Casdoor() == nil {
 			fail(w, http.StatusServiceUnavailable, "Casdoor 未初始化")
 			return
 		}
-		orgs, err := svcCtx.CasdoorClient.ListOrganizations()
+		orgs, err := svcCtx.Casdoor().ListOrganizations()
 		if err != nil {
 			fail(w, http.StatusBadGateway, err.Error())
 			return
@@ -268,7 +268,7 @@ func CreateOrganizationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			Name:        p.Name,
 			DisplayName: p.DisplayName,
 		}
-		if _, err := svcCtx.CasdoorClient.AddOrganization(org); err != nil {
+		if _, err := svcCtx.Casdoor().AddOrganization(org); err != nil {
 			fail(w, http.StatusBadGateway, err.Error())
 			return
 		}
@@ -285,7 +285,7 @@ func UpdateOrganizationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusBadRequest, "参数解析失败: "+err.Error())
 			return
 		}
-		org, err := svcCtx.CasdoorClient.GetOrganization(name)
+		org, err := svcCtx.Casdoor().GetOrganization(name)
 		if err != nil || org == nil {
 			fail(w, http.StatusNotFound, "组织不存在")
 			return
@@ -293,7 +293,7 @@ func UpdateOrganizationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		if p.DisplayName != "" {
 			org.DisplayName = p.DisplayName
 		}
-		if _, err := svcCtx.CasdoorClient.UpdateOrganization(org); err != nil {
+		if _, err := svcCtx.Casdoor().UpdateOrganization(org); err != nil {
 			fail(w, http.StatusBadGateway, err.Error())
 			return
 		}
@@ -309,7 +309,7 @@ func DeleteOrganizationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusBadRequest, "缺少组织名称")
 			return
 		}
-		if _, err := svcCtx.CasdoorClient.DeleteOrganization(name); err != nil {
+		if _, err := svcCtx.Casdoor().DeleteOrganization(name); err != nil {
 			fail(w, http.StatusBadGateway, err.Error())
 			return
 		}

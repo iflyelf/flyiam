@@ -32,7 +32,7 @@ func SyncDataSourceHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 		opts := syncOptions(svcCtx, r)
-		logic := synclogic.NewSyncLogic(svcCtx.DB, svcCtx.CasdoorClient, dslogic.NewLogic(svcCtx.DB))
+		logic := synclogic.NewSyncLogic(svcCtx.DB, svcCtx.Casdoor(), dslogic.NewLogic(svcCtx.DB))
 		go func() {
 			if err := logic.SyncFromDataSources(context.Background(), opts, "manual"); err != nil {
 				log.Printf("⚠️ 数据源同步失败: %v", err)
@@ -66,7 +66,7 @@ func GetSyncLogsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		syncType := r.URL.Query().Get("syncType")
 		status := r.URL.Query().Get("status")
 
-		logic := synclogic.NewSyncLogic(svcCtx.DB, svcCtx.CasdoorClient, dslogic.NewLogic(svcCtx.DB))
+		logic := synclogic.NewSyncLogic(svcCtx.DB, svcCtx.Casdoor(), dslogic.NewLogic(svcCtx.DB))
 		logs, total, err := logic.ListSyncLogs(r.Context(), syncType, status, (page-1)*pageSize, pageSize)
 		if err != nil {
 			fail(w, http.StatusInternalServerError, err.Error())
@@ -79,7 +79,7 @@ func GetSyncLogsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 // GetSyncProgressHandler 同步进度
 func GetSyncProgressHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logic := synclogic.NewSyncLogic(svcCtx.DB, svcCtx.CasdoorClient, dslogic.NewLogic(svcCtx.DB))
+		logic := synclogic.NewSyncLogic(svcCtx.DB, svcCtx.Casdoor(), dslogic.NewLogic(svcCtx.DB))
 		progress, err := logic.LatestProgress(r.Context())
 		if err != nil {
 			fail(w, http.StatusInternalServerError, err.Error())

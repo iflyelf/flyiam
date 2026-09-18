@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/lib/pq"
@@ -25,9 +26,36 @@ type ServiceContext struct {
 	Config         *config.Config
 	Settings       *setting.Service
 	DB             sqlx.SqlConn
-	CasdoorClient  *casdoor.Client
+	rawDB          *sql.DB
+	// casdoorRef 原子指针：页面修改 Casdoor 连接配置后可热重载（免重启）
+	casdoorRef     atomic.Pointer[casdoor.Client]
 	Cache          *cache.Cache
 	ProtectedLogic *protected.Logic
+}
+
+// Casdoor 返回当前 Casdoor 客户端（可能已被热重载替换）
+func (s *ServiceContext) Casdoor() *casdoor.Client {
+	return s.casdoorRef.Load()
+}
+
+// ReloadCasdoor 按当前配置重建 Casdoor 客户端并原子替换（免重启）。
+//
+// 触发时机：页面修改 casdoor.* 设置后。重建使用最新配置；
+// 若业务应用凭据为空（自动初始化场景），会重新读取内置应用凭据并补齐。
+func (s *ServiceContext) ReloadCasdoor(ctx context.Context) error {
+	client, err := buildCasdoorClient(s.rawDB, *s.Config, 5*time.Second)
+	if err != nil {
+		return err
+	}
+	if s.ProtectedLogic != nil {
+		if accounts, err := s.ProtectedLogic.Accounts(ctx); err == nil {
+			client.SetProtected(accounts)
+		}
+	}
+	s.casdoorRef.Store(client)
+	log.Printf("🔄 Casdoor 客户端已热重载（endpoint=%s，organization=%s）",
+		s.Config.Casdoor.Endpoint, s.Config.Casdoor.OrganizationName)
+	return nil
 }
 
 // CookieConfig 返回登录 Cookie 配置（来自 config.Security）
@@ -84,14 +112,16 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 		TTL:      c.Redis.TTL,
 	})
 
-	return &ServiceContext{
+	svcCtx := &ServiceContext{
 		Config:         c,
 		Settings:       settings,
 		DB:             sqlx.NewSqlConnFromDB(db),
-		CasdoorClient:  casdoorClient,
+		rawDB:          db,
 		Cache:          cacheClient,
 		ProtectedLogic: protectedLogic,
 	}
+	svcCtx.casdoorRef.Store(casdoorClient)
+	return svcCtx
 }
 
 // ensureDatabase 确保目标数据库存在（首次部署时自动创建）。
@@ -629,13 +659,20 @@ func createAuditLogsTable(db *sql.DB) error {
 	return err
 }
 
-// initCasdoorClient 初始化 Casdoor 客户端
+// initCasdoorClient 初始化 Casdoor 客户端（启动时，等待就绪最长 60s）
+func initCasdoorClient(db *sql.DB, c config.Config) (*casdoor.Client, error) {
+	return buildCasdoorClient(db, c, 60*time.Second)
+}
+
+// buildCasdoorClient 组装并创建 Casdoor 客户端。
 //
 // 流程：
 //  1. 组装 Casdoor 配置（回调地址缺失时用 PublicEndpoint/Endpoint 兜底生成）
 //  2. 若开启 AutoSetup 且服务可用，自动创建/补齐组织、应用、管理员，并回填应用凭据
 //  3. 使用最终凭据创建客户端并做健康检查
-func initCasdoorClient(db *sql.DB, c config.Config) (*casdoor.Client, error) {
+//
+// waitTimeout：等待 Casdoor 就绪的最长时间（启动 60s；热重载用较短值）。
+func buildCasdoorClient(db *sql.DB, c config.Config, waitTimeout time.Duration) (*casdoor.Client, error) {
 	cfg := &casdoor.Config{
 		Endpoint:                c.Casdoor.Endpoint,
 		PublicEndpoint:          c.Casdoor.PublicEndpoint,
@@ -664,7 +701,7 @@ func initCasdoorClient(db *sql.DB, c config.Config) (*casdoor.Client, error) {
 
 	// 自动初始化 Casdoor（组织/应用/管理员），并回填应用凭据
 	if c.Casdoor.AutoSetup {
-		if err := waitForCasdoor(cfg.Endpoint, 60*time.Second); err != nil {
+		if err := waitForCasdoor(cfg.Endpoint, waitTimeout); err != nil {
 			log.Printf("⚠️ 等待 Casdoor 就绪超时（继续尝试初始化）: %v", err)
 		}
 		if res, err := casdoor.EnsureSetup(db, cfg); err != nil {

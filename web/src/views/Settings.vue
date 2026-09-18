@@ -40,7 +40,7 @@
         <div class="card-header">
           <div class="title">
             <span>系统配置</span>
-            <el-tag type="info" size="small">保存后即时生效（Casdoor 连接类需重启）</el-tag>
+            <el-tag type="info" size="small">保存后即时生效（Casdoor 连接变更会自动重建客户端）</el-tag>
           </div>
           <div class="header-actions">
             <el-button :icon="Refresh" @click="loadSettings">刷新</el-button>

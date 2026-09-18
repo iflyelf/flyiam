@@ -114,6 +114,8 @@ charts/flyiam/
 | `FLYIAM_AUTH_COOKIE_DOMAIN` | 登录 Cookie 作用域（跨子域共享） | 空 |
 | `FLYIAM_CORS_ALLOWED_ORIGINS` | 允许的跨域来源（逗号分隔，为空关闭） | 空 |
 | `FLYIAM_SERVICE_TOKEN` | 全局服务令牌（可选；推荐改用页面「API 令牌」，无需环境变量） | 空 |
+| `FLYIAM_CASDOOR_ENDPOINT` / `..._CLIENT_ID` / `..._CLIENT_SECRET` 等 | Casdoor 连接：**已支持「系统设置」页面配置并热重载**，环境变量仅作首次种子 | 见 `_base` |
+| `FLYIAM_AUTH_*` / `FLYIAM_CORS_ALLOWED_ORIGINS` / `FLYIAM_PERMISSION_ADMIN_USERS` / 审计 / 日志 / JWT | 安全、跨域、权限、审计、日志、JWT：**均可在「系统设置」页面配置**（DB 优先 / env 兜底） | 见 `_base` |
 | `CASDOOR_ENABLED` | 部署内置 Casdoor | `true` |
 | `CASDOOR_REPLICAS` | Casdoor 副本数 | `2` |
 | `CASDOOR_REDIS_SESSION_ENABLED` | Casdoor 会话是否用 Redis 共享（多副本必须开启） | 跟随 `FLYIAM_REDIS_ENABLED`（默认 `true`） |

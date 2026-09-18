@@ -17,16 +17,17 @@ import (
 // Scheduler 定时任务调度器
 type Scheduler struct {
 	db       sqlx.SqlConn
-	casdoor  *casdoor.Client
-	baseTick time.Duration
+	// casdoorFn 运行时获取当前 Casdoor 客户端（支持热重载后自动用新客户端）
+	casdoorFn func() *casdoor.Client
+	baseTick  time.Duration
 }
 
-// New 创建调度器
-func New(db sqlx.SqlConn, casdoorClient *casdoor.Client) *Scheduler {
+// New 创建调度器。casdoorFn 在每次执行同步时调用，返回当前生效的客户端。
+func New(db sqlx.SqlConn, casdoorFn func() *casdoor.Client) *Scheduler {
 	return &Scheduler{
-		db:       db,
-		casdoor:  casdoorClient,
-		baseTick: time.Minute,
+		db:        db,
+		casdoorFn: casdoorFn,
+		baseTick:  time.Minute,
 	}
 }
 
@@ -79,7 +80,12 @@ func (s *Scheduler) run(ctx context.Context, scheduleLogic *schedule.Logic, cfg 
 		Concurrency:   cfg.CasdoorBatchSize,
 	}
 
-	syncer := synclogic.NewSyncLogic(s.db, s.casdoor, dslogic.NewLogic(s.db))
+	// 运行时获取当前 Casdoor 客户端（热重载后自动使用新客户端）
+	var cd *casdoor.Client
+	if s.casdoorFn != nil {
+		cd = s.casdoorFn()
+	}
+	syncer := synclogic.NewSyncLogic(s.db, cd, dslogic.NewLogic(s.db))
 
 	var runErr error
 	if cfg.SyncDataSource {
