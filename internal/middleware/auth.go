@@ -26,7 +26,7 @@ const (
 func Auth(svcCtx *svc.ServiceContext) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			token := extractToken(r)
+			token := ExtractToken(r)
 			if token == "" {
 				writeUnauthorized(w, "未登录")
 				return
@@ -94,11 +94,14 @@ func IsCasdoorAdmin(ctx context.Context) bool {
 	return false
 }
 
-// extractToken 提取登录凭证。
+// ExtractToken 提取登录凭证。
 //
 // 优先 HttpOnly Cookie（推荐，JS 无法读取，降低 XSS 窃取风险），
-// 兼容 Authorization: Bearer（API 调用/旧会话）。
-func extractToken(r *http.Request) string {
+// 兼容 Authorization: Bearer（API 调用/旧会话）与查询参数 token。
+//
+// 说明：handler 层需以相同规则取 token，故导出此函数，避免各处实现不一致
+// 导致「Cookie 登录态在部分接口失效」。
+func ExtractToken(r *http.Request) string {
 	if c, err := r.Cookie(AuthCookieName); err == nil && c.Value != "" {
 		return c.Value
 	}

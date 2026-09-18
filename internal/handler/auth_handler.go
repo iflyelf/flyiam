@@ -194,7 +194,7 @@ a{display:inline-block;padding:8px 20px;background:#2f6fed;color:#fff;text-decor
 // UserInfoHandler 返回当前登录用户信息（含有效权限列表）
 func UserInfoHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		token := extractToken(r)
+		token := middleware.ExtractToken(r)
 		if token == "" {
 			fail(w, http.StatusUnauthorized, "未登录")
 			return
@@ -318,12 +318,4 @@ func parseLocalToken(svcCtx *svc.ServiceContext, tokenStr string) (jwt.MapClaims
 		return nil, fmt.Errorf("Token 声明错误")
 	}
 	return claims, nil
-}
-
-// extractToken 从请求头或查询参数提取 Token
-func extractToken(r *http.Request) string {
-	if h := r.Header.Get("Authorization"); len(h) > 7 && h[:7] == "Bearer " {
-		return h[7:]
-	}
-	return r.URL.Query().Get("token")
 }
