@@ -1,0 +1,1 @@
+import{i as s}from"./index-CTGOk4Vt.js";function t(){return s.post("/api/sync/datasource")}function a(n=50){return s.post("/api/sync/full",null,{params:{batchSize:n}})}function e(n){return s.get("/api/sync/logs",{params:n})}function o(){return s.get("/api/sync/progress")}export{o as a,a as b,e as g,t as s};
