@@ -41,6 +41,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 
 		// 用户管理（数据来源：Casdoor）
 		{Method: http.MethodGet, Path: "/api/users", Handler: perm("user:read")(ListUsersHandler(svcCtx))},
+		{Method: http.MethodGet, Path: "/api/users/search", Handler: perm("user:read")(SearchUsersHandler(svcCtx))},
 		{Method: http.MethodGet, Path: "/api/user/detail", Handler: perm("user:read")(GetUserDetailHandler(svcCtx))},
 		{Method: http.MethodGet, Path: "/api/user/stats", Handler: perm("user:read")(GetUserStatsHandler(svcCtx))},
 		{Method: http.MethodPost, Path: "/api/users", Handler: perm("user:write")(CreateUserHandler(svcCtx))},

@@ -58,15 +58,18 @@
           <span class="hint">受保护用户不会被同步或删除操作清理（admin 始终受保护）</span>
           <div class="inline-form">
             <el-select
-              v-model="protectedForm.domainAccount"
+              v-model="protectedForm.accounts"
+              multiple
               filterable
               remote
               clearable
+              collapse-tags
+              collapse-tags-tooltip
               reserve-keyword
-              :remote-method="searchUsers"
+              :remote-method="remoteSearchUsers"
               :loading="userSelectLoading"
-              placeholder="从用户库选择用户"
-              style="width: 260px"
+              placeholder="从用户库选择用户（可多选）"
+              style="width: 320px"
             >
               <el-option
                 v-for="u in userOptions"
@@ -80,7 +83,7 @@
                 </span>
               </el-option>
             </el-select>
-            <el-input v-model="protectedForm.remark" placeholder="备注（可选）" style="width: 200px" />
+            <el-input v-model="protectedForm.remark" placeholder="备注（可选，应用于本次新增）" style="width: 220px" />
             <el-button type="primary" :icon="Plus" @click="handleProtectedAdd">新增</el-button>
           </div>
         </div>
@@ -182,7 +185,7 @@ import {
   addProtectedUser,
   deleteProtectedUser
 } from '@/api/casdoor'
-import { listUsers } from '@/api/user'
+import { searchUsers } from '@/api/user'
 import { formatDateTime } from '@/utils/time'
 
 const activeTab = ref('apps')
@@ -192,7 +195,7 @@ const saving = ref(false)
 const apps = ref([])
 const orgs = ref([])
 const protectedUsers = ref([])
-const protectedForm = ref({ domainAccount: '', remark: '' })
+const protectedForm = ref({ accounts: [], remark: '' })
 // 用户库下拉选项（排除已在受保护列表中的账号）
 const userOptions = ref([])
 const userSelectLoading = ref(false)
@@ -236,13 +239,13 @@ const loadProtected = async () => {
   loadUserOptions()
 }
 
-// 从用户库加载可选用户（供下拉选择），支持关键字搜索
+// 从用户库加载可选用户（供下拉选择），支持按域账号/姓名搜索
 const loadUserOptions = async (keyword = '') => {
   userSelectLoading.value = true
   try {
-    const res = await listUsers({ page: 1, pageSize: 200, field: 'name', keyword })
+    const res = await searchUsers(keyword, 50)
     const protectedSet = new Set(protectedUsers.value.map((p) => p.domainAccount))
-    userOptions.value = (res.data?.list || []).filter((u) => !protectedSet.has(u.domainAccount))
+    userOptions.value = (res.data || []).filter((u) => !protectedSet.has(u.domainAccount))
   } catch (e) {
     // 加载失败时保持原有选项，不阻断页面
   } finally {
@@ -250,8 +253,8 @@ const loadUserOptions = async (keyword = '') => {
   }
 }
 
-// el-select 远程搜索
-const searchUsers = (keyword) => {
+// el-select 远程搜索（按域账号/姓名）
+const remoteSearchUsers = (keyword) => {
   loadUserOptions(keyword || '')
 }
 
@@ -369,14 +372,16 @@ const handleOrgDelete = async (row) => {
 
 // ---------------- 受保护用户 ----------------
 const handleProtectedAdd = async () => {
-  if (!protectedForm.value.domainAccount) {
+  const accounts = protectedForm.value.accounts || []
+  if (accounts.length === 0) {
     ElMessage.warning('请从用户库选择用户')
     return
   }
   try {
-    await addProtectedUser(protectedForm.value)
-    ElMessage.success('已新增')
-    protectedForm.value = { domainAccount: '', remark: '' }
+    const res = await addProtectedUser({ accounts, remark: protectedForm.value.remark })
+    const added = res.data?.added ?? accounts.length
+    ElMessage.success(`已新增 ${added} 个受保护用户`)
+    protectedForm.value = { accounts: [], remark: '' }
     loadProtected()
   } catch (e) {
     // 错误提示由请求拦截器统一处理

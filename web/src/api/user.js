@@ -5,6 +5,11 @@ export function listUsers(params) {
   return request.get('/api/users', { params })
 }
 
+// 用户搜索（跨域账号/姓名，供选择器下拉使用；不分页）
+export function searchUsers(keyword = '', limit = 50) {
+  return request.get('/api/users/search', { params: { keyword, limit } })
+}
+
 // 用户详情
 export function getUserDetail(domainAccount) {
   return request.get('/api/user/detail', { params: { domainAccount } })

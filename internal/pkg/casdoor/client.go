@@ -635,6 +635,66 @@ func (c *Client) GetUserCount() (int, error) {
 	return total, err
 }
 
+// SearchUsers 按关键字跨字段搜索用户（域账号 name + 姓名 displayName）。
+//
+// 背景：Casdoor 的 get-users 仅支持单字段 LIKE 查询，无法一次匹配多个字段；
+// 故分别以 name / displayName 查询后合并去重，供用户选择器（下拉搜索）使用。
+//
+// 参数：
+//   - keyword 为关键字；为空时返回前 limit 个用户。
+//   - limit   返回上限（<=0 或 >200 时取 50）。
+func (c *Client) SearchUsers(keyword string, limit int) ([]*casdoorsdk.User, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	keyword = strings.TrimSpace(keyword)
+
+	// 无条件拉取（无关键字）：直接返回前 limit 条
+	if keyword == "" {
+		users, _, err := c.GetUsersPage(1, limit, "", "")
+		return users, err
+	}
+
+	// 域账号（name）模糊匹配
+	nameUsers, _, err := c.GetUsersPage(1, limit, "name", keyword)
+	if err != nil {
+		return nil, err
+	}
+	if merged := dedupeUsers(nameUsers, limit); len(merged) >= limit {
+		return merged, nil
+	}
+
+	// 姓名（displayName）模糊匹配（补充）
+	displayUsers, _, err := c.GetUsersPage(1, limit, "displayName", keyword)
+	if err != nil {
+		return nil, err
+	}
+	return dedupeUsers(append(nameUsers, displayUsers...), limit), nil
+}
+
+// dedupeUsers 按 owner/name 去重并截断到 limit。
+//
+// 抽出为纯函数以便单测（合并多字段搜索结果、保持首次出现顺序）。
+func dedupeUsers(users []*casdoorsdk.User, limit int) []*casdoorsdk.User {
+	seen := make(map[string]struct{}, len(users))
+	out := make([]*casdoorsdk.User, 0, len(users))
+	for _, u := range users {
+		if u == nil {
+			continue
+		}
+		key := u.Owner + "/" + u.Name
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, u)
+		if limit > 0 && len(out) >= limit {
+			break
+		}
+	}
+	return out
+}
+
 // BatchDeleteUsers 批量删除用户（跳过受保护用户）
 //
 // 返回：删除成功数、被跳过（受保护）用户、失败明细

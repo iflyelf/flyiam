@@ -3,6 +3,7 @@ package protected
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/iflyelf/flyiam/internal/model"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
@@ -50,6 +51,29 @@ func (l *Logic) Add(ctx context.Context, account, remark string) error {
 		return fmt.Errorf("新增受保护用户失败: %w", err)
 	}
 	return nil
+}
+
+// AddBatch 批量新增受保护用户（幂等，忽略空账号并去重）
+//
+// 返回实际写入的账号数。
+func (l *Logic) AddBatch(ctx context.Context, accounts []string, remark string) (int, error) {
+	seen := make(map[string]struct{}, len(accounts))
+	n := 0
+	for _, a := range accounts {
+		a = strings.TrimSpace(a)
+		if a == "" {
+			continue
+		}
+		if _, ok := seen[a]; ok {
+			continue
+		}
+		seen[a] = struct{}{}
+		if err := l.Add(ctx, a, remark); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
 }
 
 // Delete 删除受保护用户

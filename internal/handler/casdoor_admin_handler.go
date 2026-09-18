@@ -25,27 +25,42 @@ func ListProtectedUsersHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 }
 
 // AddProtectedUserHandler 新增受保护用户
+//
+// 支持单个与批量：
+//   - { "domainAccount": "zhangsan", "remark": "..." }
+//   - { "accounts": ["zhangsan","lisi"], "remark": "..." }
+//
+// 幂等：已存在的账号仅更新备注。
 func AddProtectedUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			DomainAccount string `json:"domainAccount"`
-			Remark        string `json:"remark"`
+			DomainAccount string   `json:"domainAccount"`
+			Accounts      []string `json:"accounts"`
+			Remark        string   `json:"remark"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			fail(w, http.StatusBadRequest, "参数解析失败: "+err.Error())
 			return
 		}
-		req.DomainAccount = strings.TrimSpace(req.DomainAccount)
-		if req.DomainAccount == "" {
-			fail(w, http.StatusBadRequest, "域账号不能为空")
+
+		// 合并单个与批量入参，去空白
+		accounts := make([]string, 0, len(req.Accounts)+1)
+		if s := strings.TrimSpace(req.DomainAccount); s != "" {
+			accounts = append(accounts, s)
+		}
+		accounts = append(accounts, req.Accounts...)
+
+		if len(accounts) == 0 {
+			fail(w, http.StatusBadRequest, "请至少选择一个用户")
 			return
 		}
-		if err := svcCtx.ProtectedLogic.Add(r.Context(), req.DomainAccount, req.Remark); err != nil {
+		added, err := svcCtx.ProtectedLogic.AddBatch(r.Context(), accounts, req.Remark)
+		if err != nil {
 			fail(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		refreshProtected(svcCtx, r)
-		ok(w, nil)
+		ok(w, map[string]interface{}{"added": added})
 	}
 }
 

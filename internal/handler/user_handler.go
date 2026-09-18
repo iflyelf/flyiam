@@ -79,6 +79,34 @@ func ListUsersHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	}
 }
 
+// SearchUsersHandler 用户搜索（跨域账号/姓名，供选择器下拉使用）
+//
+// 与列表接口不同：不分页，按关键字同时匹配域账号与姓名，返回去重后的前 N 条，
+// 适合「选择用户」场景（如新增受保护用户）。
+func SearchUsersHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svcCtx.Casdoor() == nil {
+			fail(w, http.StatusServiceUnavailable, "Casdoor 未初始化")
+			return
+		}
+		keyword := strings.TrimSpace(r.URL.Query().Get("keyword"))
+		limit := atoiDefault(r.URL.Query().Get("limit"), 50)
+		if limit < 1 || limit > 200 {
+			limit = 50
+		}
+		users, err := svcCtx.Casdoor().SearchUsers(keyword, limit)
+		if err != nil {
+			fail(w, http.StatusBadGateway, "查询 Casdoor 用户失败: "+err.Error())
+			return
+		}
+		views := make([]model.UserView, 0, len(users))
+		for _, u := range users {
+			views = append(views, casdoorToView(svcCtx, u))
+		}
+		ok(w, views)
+	}
+}
+
 // friendlyCasdoorErr 将 Casdoor 返回的英文错误转换为友好中文提示
 func friendlyCasdoorErr(msg string) string {
 	switch {
