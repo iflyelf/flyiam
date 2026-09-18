@@ -1,6 +1,9 @@
 package config
 
-import "sync/atomic"
+import (
+	"encoding/json"
+	"sync/atomic"
+)
 
 // Store 持有当前生效的配置快照，支持并发读与安全的整体替换。
 //
@@ -9,7 +12,7 @@ import "sync/atomic"
 //   - 写者（页面保存设置）先 Clone() 出副本、在副本上修改，再 Store() 原子替换；
 //   - 已发布的快照永不被修改，因此不存在读写同一字段的数据竞争。
 //
-// 这与直接共享 *Config 并就地修改不同：后者在并发读写下属于数据竞争
+// 与直接共享 *Config 并就地修改不同：后者在并发读写下属于数据竞争
 // （slice 头等可能被撕裂，Go 内存模型下为未定义行为）。
 type Store struct {
 	v atomic.Pointer[Config]
@@ -32,25 +35,24 @@ func (s *Store) Store(c *Config) {
 	s.v.Store(c)
 }
 
-// Clone 深拷贝配置（浅拷贝整体 + 逐个复制可变切片），供写时复制使用。
+// Clone 返回配置的深拷贝，供写时复制使用。
 //
-// 说明：结构体内所有字段均为值类型或已知切片；只需深拷贝设置项会修改的
-// 切片，避免副本与快照共享底层数组。
+// 采用 JSON 序列化往返实现：自动覆盖**全部**字段（含嵌套结构体、切片、映射），
+// 因此后续新增可配置字段（尤其是切片/指针）时无需再手工补充深拷贝逻辑，
+// 从根本上避免「新增字段被漏拷、副本与原快照共享底层数组」的隐患。
+//
+// 说明：Config 由配置加载/合并产生，字段均为可序列化的值类型；若极端情况下
+// 序列化失败则回退为浅拷贝（不影响并发安全，仅可能共享切片）。
 func (c *Config) Clone() *Config {
-	cp := *c
-	cp.Casdoor.ProtectedUsers = cloneStrings(c.Casdoor.ProtectedUsers)
-	cp.Casdoor.RedirectURIs = cloneStrings(c.Casdoor.RedirectURIs)
-	cp.Casdoor.AllowedRedirectHosts = cloneStrings(c.Casdoor.AllowedRedirectHosts)
-	cp.Security.CORSAllowedOrigins = cloneStrings(c.Security.CORSAllowedOrigins)
-	cp.Permission.AdminUsers = cloneStrings(c.Permission.AdminUsers)
-	return &cp
-}
-
-func cloneStrings(in []string) []string {
-	if in == nil {
-		return nil
+	data, err := json.Marshal(c)
+	if err != nil {
+		cp := *c
+		return &cp
 	}
-	out := make([]string, len(in))
-	copy(out, in)
-	return out
+	var cp Config
+	if err := json.Unmarshal(data, &cp); err != nil {
+		shallow := *c
+		return &shallow
+	}
+	return &cp
 }

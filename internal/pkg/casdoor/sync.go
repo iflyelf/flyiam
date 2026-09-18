@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -108,28 +109,18 @@ func (c *Client) BatchSync(ctx context.Context, users []SyncUser, existing map[s
 			defer func() { <-sem }()
 
 			ex := existing[u.DomainAccount]
-			isNew := ex == nil
 
+			// panic 兜底：worker 在独立 goroutine 中，panic 会终止整个进程。
+			// 用内联函数捕获并转为该项错误，保证单项异常不拖垮整批同步。
 			var err error
-			if isNew {
-				err = c.createNewUser(u)
-			} else {
-				err = c.updateExistingUser(ex, u)
-			}
-
-			// 手机号非法或重复时，清空手机号兜底重试，保证用户仍能进入 Casdoor
-			if err != nil && strings.Contains(err.Error(), "Phone") && u.Phone != "" {
-				u.Phone = ""
-				if u.Properties == nil {
-					u.Properties = map[string]string{}
-				}
-				u.Properties["phoneInvalid"] = "true"
-				if isNew {
-					err = c.createNewUser(u)
-				} else {
-					err = c.updateExistingUser(ex, u)
-				}
-			}
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						err = fmt.Errorf("panic: %v\n%s", r, debug.Stack())
+					}
+				}()
+				err = c.syncOneUser(ex, u)
+			}()
 
 			mu.Lock()
 			if err != nil {
@@ -139,7 +130,7 @@ func (c *Client) BatchSync(ctx context.Context, users []SyncUser, existing map[s
 				}
 			} else {
 				result.Success++
-				if isNew {
+				if ex == nil {
 					result.Created++
 				} else {
 					result.Updated++
@@ -163,6 +154,34 @@ func (c *Client) BatchSync(ctx context.Context, users []SyncUser, existing map[s
 	log.Printf("✅ Casdoor 同步完成: 成功 %d/%d（新增 %d，更新 %d），失败 %d",
 		result.Success, result.Total, result.Created, result.Updated, result.Failed)
 	return result
+}
+
+// syncOneUser 同步单个用户（新增或更新）。
+//
+// 手机号非法或重复时，清空手机号兜底重试，保证用户仍能进入 Casdoor。
+func (c *Client) syncOneUser(existing *casdoorsdk.User, u SyncUser) error {
+	isNew := existing == nil
+
+	var err error
+	if isNew {
+		err = c.createNewUser(u)
+	} else {
+		err = c.updateExistingUser(existing, u)
+	}
+
+	if err != nil && strings.Contains(err.Error(), "Phone") && u.Phone != "" {
+		u.Phone = ""
+		if u.Properties == nil {
+			u.Properties = map[string]string{}
+		}
+		u.Properties["phoneInvalid"] = "true"
+		if isNew {
+			err = c.createNewUser(u)
+		} else {
+			err = c.updateExistingUser(existing, u)
+		}
+	}
+	return err
 }
 
 // createNewUser 创建新用户

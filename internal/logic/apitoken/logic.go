@@ -114,6 +114,7 @@ func (l *Logic) touchLastUsed(id int64) {
 	case lastUsedSem <- struct{}{}:
 		go func() {
 			defer func() { <-lastUsedSem }()
+			defer func() { _ = recover() }() // 后台更新失败不应影响进程
 			_, _ = l.db.ExecCtx(context.Background(),
 				`UPDATE api_tokens SET last_used_at = NOW() WHERE id = $1`, id)
 		}()

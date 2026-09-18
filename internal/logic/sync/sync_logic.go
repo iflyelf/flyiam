@@ -236,13 +236,25 @@ func (l *SyncLogic) deleteUsers(ctx context.Context, names []string, concurrency
 		go func(n string) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			if _, err := l.casdoorClient.DeleteUser(n); err == nil {
+
+			// panic 兜底：worker 在独立 goroutine 中，panic 会终止整个进程
+			var derr error
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						derr = fmt.Errorf("panic: %v\n%s", r, debug.Stack())
+					}
+				}()
+				_, derr = l.casdoorClient.DeleteUser(n)
+			}()
+
+			if derr == nil {
 				mu.Lock()
 				deleted++
 				deletedNames = append(deletedNames, n)
 				mu.Unlock()
 			} else {
-				log.Printf("⚠️ 删除用户 %s 失败: %v", n, err)
+				log.Printf("⚠️ 删除用户 %s 失败: %v", n, derr)
 			}
 		}(name)
 	}

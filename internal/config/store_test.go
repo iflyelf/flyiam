@@ -1,8 +1,11 @@
 package config
 
 import (
+	"reflect"
 	"sync"
 	"testing"
+
+	"github.com/zeromicro/go-zero/core/conf"
 )
 
 // TestStoreConcurrentReadWrite 验证快照存储的并发读写下无数据竞争（配合 -race）。
@@ -93,5 +96,25 @@ func TestCloneDeepCopiesSlices(t *testing.T) {
 	}
 	if c.Casdoor.AllowedRedirectHosts[0] != "a" {
 		t.Error("Clone 未深拷贝 Casdoor.AllowedRedirectHosts")
+	}
+}
+
+// TestCloneRoundTripLossless 验证 Clone 往返后配置与原始完全一致（无字段丢失）。
+//
+// 采用 JSON 往返实现深拷贝，若 Config 中混入不可序列化字段会在此暴露。
+// 配合 conf.FillDefault 覆盖全部默认字段，使比对更完整。
+func TestCloneRoundTripLossless(t *testing.T) {
+	c := &Config{}
+	if err := conf.FillDefault(c); err != nil {
+		t.Fatalf("填充默认值失败: %v", err)
+	}
+	c.Admin.Username = "admin"
+	c.Permission.AdminUsers = []string{"admin", "ops"}
+	c.Security.CORSAllowedOrigins = []string{"https://a", "https://b"}
+	c.Casdoor.ProtectedUsers = []string{"admin"}
+
+	cp := c.Clone()
+	if !reflect.DeepEqual(c, cp) {
+		t.Fatal("Clone 往返后与原配置不一致（疑似字段丢失）")
 	}
 }
