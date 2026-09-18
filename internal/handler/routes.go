@@ -55,8 +55,17 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/user-fields", Handler: perm("userfield:write")(CreateUserFieldHandler(svcCtx))},
 		{Method: http.MethodPut, Path: "/api/user-fields/:id", Handler: perm("userfield:write")(UpdateUserFieldHandler(svcCtx))},
 		{Method: http.MethodDelete, Path: "/api/user-fields/:id", Handler: perm("userfield:write")(DeleteUserFieldHandler(svcCtx))},
-		// 服务间导出（供 Consul Manager 等同步字段定义，需 SERVICE_TOKEN）
+		// 服务间导出（供 Consul Manager 等同步字段定义，需 API 令牌或 SERVICE_TOKEN）
 		{Method: http.MethodGet, Path: "/api/user-fields/export", Handler: middleware.ServiceAuth(svcCtx)(ListUserFieldsHandler(svcCtx))},
+
+		// 用户 API 令牌（页面生成/吊销，可设有效期或永久；仅管理员可管理）
+		{Method: http.MethodGet, Path: "/api/tokens", Handler: perm("setting:read")(ListTokensHandler(svcCtx))},
+		{Method: http.MethodPost, Path: "/api/tokens", Handler: perm("setting:write")(CreateTokenHandler(svcCtx))},
+		{Method: http.MethodDelete, Path: "/api/tokens/:id", Handler: perm("setting:write")(RevokeTokenHandler(svcCtx))},
+
+		// 应用设置（页面可配置，DB 优先 / env 兜底）
+		{Method: http.MethodGet, Path: "/api/settings", Handler: perm("setting:read")(ListSettingsHandler(svcCtx))},
+		{Method: http.MethodPut, Path: "/api/settings", Handler: perm("setting:write")(UpdateSettingsHandler(svcCtx))},
 
 		// 受保护用户（页面可配置）
 		{Method: http.MethodGet, Path: "/api/protected-users", Handler: perm("user:read")(ListProtectedUsersHandler(svcCtx))},

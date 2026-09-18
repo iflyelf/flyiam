@@ -40,6 +40,7 @@ type TeamMember struct {
 var AllPermissions = []string{
 	"user:read", "user:write", "user:delete",
 	"userfield:read", "userfield:write",
+	"setting:read", "setting:write",
 	"team:read", "team:write", "team:delete",
 	"role:read", "role:write", "role:delete",
 	"sync:read", "sync:write",

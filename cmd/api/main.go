@@ -61,11 +61,16 @@ func main() {
 		logx.Must(err)
 	}
 
-	// 配置日志
+	// 配置日志（使用带 env 标签的 LogConfig）
+	c.Log.Level = c.LogConfig.Level
 	logx.MustSetup(c.Log)
 
 	// 打印启动信息
 	printBanner()
+
+	// 初始化服务上下文（数据库、Casdoor、缓存、页面设置）。
+	// 注意：需在创建服务器前完成，使页面设置（如跨域来源）能在启动时生效。
+	svcCtx := svc.NewServiceContext(&c)
 
 	// 创建 REST 服务器
 	// 关键：未匹配的请求交给 SPA 处理器，用于提供前端静态文件与前端路由回退
@@ -87,9 +92,6 @@ func main() {
 	}
 	server := rest.MustNewServer(c.RestConf, opts...)
 	defer server.Stop()
-
-	// 初始化服务上下文（数据库、Casdoor、缓存）
-	svcCtx := svc.NewServiceContext(c)
 
 	// 启动定时任务调度器
 	schedCtx, cancelScheduler := context.WithCancel(context.Background())

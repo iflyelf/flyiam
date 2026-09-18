@@ -122,7 +122,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   UserFilled, SwitchButton, Odometer, User, Refresh, Document,
-  Setting, ArrowDown, Timer, Connection, Lock, Grid, OfficeBuilding, SetUp
+  Setting, ArrowDown, Timer, Connection, Lock, Grid, OfficeBuilding, SetUp, Key
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
@@ -150,6 +150,7 @@ const mainMenus = [
   { path: '/schedule', label: '定时任务', icon: Timer, perm: 'schedule:read' },
   { path: '/logs', label: '同步日志', icon: Document, perm: 'sync:read' },
   { path: '/casdoor', label: 'Casdoor 管理', icon: Connection, perm: 'casdoor:read' },
+  { path: '/tokens', label: 'API 令牌', icon: Key, perm: 'setting:read' },
   { path: '/settings', label: '系统设置', icon: Setting }
 ]
 

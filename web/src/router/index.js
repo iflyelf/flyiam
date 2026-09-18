@@ -76,6 +76,12 @@ const routes = [
         meta: { title: 'Casdoor 管理', icon: 'Connection', requiresAuth: true }
       },
       {
+        path: '/tokens',
+        name: 'Tokens',
+        component: () => import('@/views/Tokens.vue'),
+        meta: { title: 'API 令牌', icon: 'Key', requiresAuth: true }
+      },
+      {
         path: '/settings',
         name: 'Settings',
         component: () => import('@/views/Settings.vue'),

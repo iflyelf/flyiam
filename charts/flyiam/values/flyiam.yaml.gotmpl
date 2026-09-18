@@ -334,10 +334,6 @@ secret:
   {{- if .Values.datasourceHttpApiAuthToken }}
   DATASOURCE_HTTPAPI_AUTH_TOKEN: {{ .Values.datasourceHttpApiAuthToken | quote }}
   {{- end }}
-  {{- if .Values.serviceToken }}
-  # 服务间调用凭证（供 Consul Manager 同步用户字段；经 Secret 注入，不落 env 明文）
-  SERVICE_TOKEN: {{ .Values.serviceToken | quote }}
-  {{- end }}
 
 # ============================================
 # 内置 Casdoor 部署配置（随本 Chart 一起部署）

@@ -16,11 +16,14 @@ import (
 	"github.com/iflyelf/flyiam/internal/logic/userfield"
 	"github.com/iflyelf/flyiam/internal/pkg/cache"
 	"github.com/iflyelf/flyiam/internal/pkg/casdoor"
+	"github.com/iflyelf/flyiam/internal/setting"
 )
 
 // ServiceContext 服务上下文
 type ServiceContext struct {
-	Config         config.Config
+	// Config 使用指针：页面修改设置后直接写回，既有读取点自动生效（无需重启）
+	Config         *config.Config
+	Settings       *setting.Service
 	DB             sqlx.SqlConn
 	CasdoorClient  *casdoor.Client
 	Cache          *cache.Cache
@@ -37,17 +40,24 @@ func (s *ServiceContext) CookieConfig() config.CookieConfig {
 }
 
 // NewServiceContext 创建服务上下文
-func NewServiceContext(c config.Config) *ServiceContext {
+func NewServiceContext(c *config.Config) *ServiceContext {
 	// 初始化数据库连接
-	db := initDB(c)
+	db := initDB(*c)
 
 	// 初始化数据库表（自动创建表结构）
-	if err := initSchema(db, c); err != nil {
+	if err := initSchema(db, *c); err != nil {
 		log.Fatalf("❌ 初始化数据库失败: %v", err)
 	}
 
+	// 加载页面设置（DB 优先 / env 兜底），在初始化 Casdoor 客户端前应用，
+	// 使数据库中的连接类配置也能在首次启动生效。
+	settings := setting.NewService(sqlx.NewSqlConnFromDB(db), c)
+	if err := settings.Load(context.Background()); err != nil {
+		log.Printf("⚠️ 加载应用设置失败（将使用环境变量默认值）: %v", err)
+	}
+
 	// 初始化 Casdoor 客户端（含自动初始化组织/应用/管理员）
-	casdoorClient, err := initCasdoorClient(db, c)
+	casdoorClient, err := initCasdoorClient(db, *c)
 	if err != nil {
 		log.Fatalf("❌ 初始化 Casdoor 客户端失败: %v", err)
 	}
@@ -76,6 +86,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 
 	return &ServiceContext{
 		Config:         c,
+		Settings:       settings,
 		DB:             sqlx.NewSqlConnFromDB(db),
 		CasdoorClient:  casdoorClient,
 		Cache:          cacheClient,
@@ -306,6 +317,16 @@ func initSchema(db *sql.DB, c config.Config) error {
 		return fmt.Errorf("创建权限相关表失败: %w", err)
 	}
 
+	// 创建用户 API 令牌表
+	if err := createApiTokensTable(db); err != nil {
+		return fmt.Errorf("创建 API 令牌表失败: %w", err)
+	}
+
+	// 创建应用设置表（页面可配置，DB 优先 / env 兜底）
+	if err := createAppSettingsTable(db); err != nil {
+		return fmt.Errorf("创建应用设置表失败: %w", err)
+	}
+
 	// 迁移历史 timestamp 列为 timestamptz（修复时间显示偏移）
 	if err := migrateTimestamps(db); err != nil {
 		return fmt.Errorf("迁移时间字段失败: %w", err)
@@ -423,6 +444,39 @@ func createRBACTables(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_team_roles_team ON team_roles(team_id);
 	CREATE INDEX IF NOT EXISTS idx_roles_code ON roles(code);
 	CREATE INDEX IF NOT EXISTS idx_teams_code ON teams(code);
+	`
+	_, err := db.Exec(schema)
+	return err
+}
+
+// createApiTokensTable 创建用户 API 令牌表（仅存哈希，明文只在创建时返回）
+func createApiTokensTable(db *sql.DB) error {
+	schema := `
+	CREATE TABLE IF NOT EXISTS api_tokens (
+		id BIGSERIAL PRIMARY KEY,
+		username VARCHAR(100) NOT NULL,
+		name VARCHAR(100) NOT NULL DEFAULT '',
+		token_hash VARCHAR(64) NOT NULL UNIQUE,
+		token_prefix VARCHAR(64) NOT NULL DEFAULT '',
+		expires_at TIMESTAMPTZ,
+		enabled BOOLEAN NOT NULL DEFAULT TRUE,
+		last_used_at TIMESTAMPTZ,
+		created_at TIMESTAMPTZ DEFAULT NOW()
+	);
+	CREATE INDEX IF NOT EXISTS idx_api_tokens_username ON api_tokens(username);
+	`
+	_, err := db.Exec(schema)
+	return err
+}
+
+// createAppSettingsTable 创建应用设置表（页面可配置，DB 优先 / env 兜底）
+func createAppSettingsTable(db *sql.DB) error {
+	schema := `
+	CREATE TABLE IF NOT EXISTS app_settings (
+		key VARCHAR(128) PRIMARY KEY,
+		value TEXT NOT NULL DEFAULT '',
+		updated_at TIMESTAMPTZ DEFAULT NOW()
+	);
 	`
 	_, err := db.Exec(schema)
 	return err

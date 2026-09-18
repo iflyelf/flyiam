@@ -177,7 +177,7 @@ Casdoor 与 FlyIAM **共用同一数据库**（表前缀 `casdoor_`），
 | `FLYIAM_CASDOOR_AUTO_SETUP` | 自动初始化 Casdoor | `true` |
 | `FLYIAM_CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码（生产必须覆盖） | `ysyh!9Sky` |
 | `FLYIAM_PERMISSION_ADMIN_USERS` | 超级管理员名单（逗号分隔） | 空（依赖 Casdoor `isAdmin`） |
-| `FLYIAM_SERVICE_TOKEN` | 服务间调用凭证（供 Consul Manager 同步用户字段定义） | 空 |
+| `FLYIAM_SERVICE_TOKEN` | 全局服务令牌（可选；推荐改用页面「API 令牌」） | 空 |
 | `FLYIAM_CASDOOR_PROTECTED_USERS` | 受保护用户（逗号分隔） | 空 |
 | `FLYIAM_CASDOOR_COUNTRY_CODE` | 手机号区域 | `CN` |
 
