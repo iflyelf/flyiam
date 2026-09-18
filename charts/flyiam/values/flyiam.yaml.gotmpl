@@ -240,6 +240,18 @@ env:
   - name: CASDOOR_AUTO_REDIRECT_URI
     value: {{ .Values.casdoorAutoRedirectUri | quote }}
   
+  # Casdoor 同步配置
+  - name: CASDOOR_SYNC_ENABLED
+    value: {{ .Values.casdoorSyncEnabled | quote }}
+  - name: CASDOOR_SYNC_AUTO
+    value: {{ .Values.casdoorSyncAuto | quote }}
+  - name: CASDOOR_SYNC_BATCH_SIZE
+    value: {{ .Values.casdoorSyncBatchSize | quote }}
+  - name: CASDOOR_SYNC_RETRY_TIMES
+    value: {{ .Values.casdoorSyncRetryTimes | quote }}
+  - name: CASDOOR_SYNC_RETRY_INTERVAL
+    value: {{ .Values.casdoorSyncRetryInterval | quote }}
+  
   # 数据源配置：已改为「页面管理」（存数据库），无需环境变量。
 
 # ============================================
