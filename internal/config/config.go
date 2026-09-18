@@ -234,14 +234,15 @@ func (c *Config) Validate() error {
 	if c.Casdoor.Endpoint == "" {
 		return fmt.Errorf("Casdoor 端点未设置: 请设置 CASDOOR_ENDPOINT 环境变量")
 	}
-	if c.Casdoor.ClientId == "" {
-		return fmt.Errorf("Casdoor Client ID 未设置: 请设置 CASDOOR_CLIENT_ID 环境变量")
-	}
 	if c.Casdoor.DefaultPassword == "" {
 		return fmt.Errorf("Casdoor 默认密码未设置: 请设置 CASDOOR_DEFAULT_PASSWORD 环境变量或 Secret（不再提供弱口令默认值）")
 	}
-	if c.Casdoor.ClientSecret == "" {
-		return fmt.Errorf("Casdoor Client Secret 未设置: 请设置 CASDOOR_CLIENT_SECRET 环境变量")
+	// 应用凭据：
+	//   - 开启 AutoSetup（默认）时可留空，由程序在启动时从内置应用读取/创建业务应用
+	//     并回填凭据（见 svc.buildCasdoorClient → casdoor.EnsureSetup）；
+	//   - 关闭 AutoSetup 时必须显式提供，否则无法建立客户端。
+	if !c.Casdoor.AutoSetup && (c.Casdoor.ClientId == "" || c.Casdoor.ClientSecret == "") {
+		return fmt.Errorf("Casdoor 应用凭据未设置: 请设置 CASDOOR_CLIENT_ID / CASDOOR_CLIENT_SECRET，或开启 CASDOOR_AUTO_SETUP 自动创建")
 	}
 
 	return nil
