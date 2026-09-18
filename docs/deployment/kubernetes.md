@@ -175,7 +175,7 @@ Casdoor 与 FlyIAM **共用同一数据库**（表前缀 `casdoor_`），
 | `FLYIAM_CASDOOR_ENDPOINT` | Casdoor 后端地址（集群内） | `http://casdoor:8000` |
 | `FLYIAM_CASDOOR_PUBLIC_ENDPOINT` | Casdoor 浏览器地址（外置域名，标准端口 80/443） | - |
 | `FLYIAM_CASDOOR_AUTO_SETUP` | 自动初始化 Casdoor | `true` |
-| `FLYIAM_CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码 | `ysyh!9Sky` |
+| `FLYIAM_CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码（生产必须覆盖） | `ysyh!9Sky` |
 | `FLYIAM_CASDOOR_COUNTRY_CODE` | 手机号区域 | `CN` |
 
 ## 6. 访问

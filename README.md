@@ -52,12 +52,17 @@ FlyIAM 面向企业统一身份治理，提供「用户 + 组织 + 权限」的�
 ```bash
 git clone https://github.com/iflyelf/flyiam.git
 cd flyiam
+
+# 默认密码无内置值，必须显式设置（否则启动校验失败）
+export CASDOOR_DEFAULT_PASSWORD='<强密码>'
+export ADMIN_PASSWORD='<强密码>'
+
 docker compose up -d
 
 # 应用：http://localhost:8081
 # Casdoor：http://localhost:8000
-# Casdoor 内置管理员：admin / 123（上游硬编码，与 CASDOOR_DEFAULT_PASSWORD 无关）
-# FlyIAM 业务管理员：flyiam/admin / ysyh!9Sky（密码取 CASDOOR_DEFAULT_PASSWORD）
+# Casdoor 内置管理员：admin / 123（上游硬编码，与本配置无关，首次登录请立即修改）
+# FlyIAM 业务管理员：flyiam/admin / <CASDOOR_DEFAULT_PASSWORD>
 ```
 
 ### Kubernetes
@@ -102,7 +107,7 @@ cd web && npm install && npm run dev
 | `CASDOOR_ENDPOINT` | Casdoor 后端地址（集群内） | `http://casdoor:8000` |
 | `CASDOOR_PUBLIC_ENDPOINT` | Casdoor 浏览器地址（外置域名，标准端口 80/443） | 空 |
 | `CASDOOR_AUTO_SETUP` | 自动初始化 Casdoor | `true` |
-| `CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码 | `ysyh!9Sky` |
+| `CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码（**必填**，无内置默认值） | - |
 | `CASDOOR_COUNTRY_CODE` | 手机号区域 | `CN` |
 
 完整清单见 [配置说明](etc/config.yaml) 与 [Kubernetes 部署](docs/deployment/kubernetes.md)。

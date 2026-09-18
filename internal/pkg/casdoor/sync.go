@@ -193,24 +193,33 @@ func (c *Client) createNewUser(user SyncUser) error {
 	})
 }
 
-// updateExistingUser 更新已存在的用户
+// updateExistingUser 更新已存在的用户。
+//
+// 注意：不原地修改传入的 existing 对象。existing 来自调用方的共享 map，
+// 原地修改会产生副作用（污染调用方数据、并发/重试时不安全）。
+// 这里复制一份再更新，仅对副本做修改。
 func (c *Client) updateExistingUser(existing *casdoorsdk.User, newData SyncUser) error {
-	existing.DisplayName = newData.Name
-	existing.Email = newData.Email
-	existing.Phone = newData.Phone
-	existing.CountryCode = c.config.CountryCode
-	existing.Affiliation = newData.Affiliation
-	existing.Tag = "synced"
-	if newData.Properties != nil {
-		if existing.Properties == nil {
-			existing.Properties = map[string]string{}
-		}
-		for k, v := range newData.Properties {
-			existing.Properties[k] = v
-		}
+	u := *existing
+
+	// 深拷贝 Properties，避免与调用方共享底层 map
+	props := make(map[string]string, len(existing.Properties)+len(newData.Properties))
+	for k, v := range existing.Properties {
+		props[k] = v
 	}
+	for k, v := range newData.Properties {
+		props[k] = v
+	}
+
+	u.DisplayName = newData.Name
+	u.Email = newData.Email
+	u.Phone = newData.Phone
+	u.CountryCode = c.config.CountryCode
+	u.Affiliation = newData.Affiliation
+	u.Tag = "synced"
+	u.Properties = props
+
 	return withRetry(syncRetryAttempts, syncRetryInterval, func() error {
-		_, err := c.UpdateUser(existing)
+		_, err := c.UpdateUser(&u)
 		return err
 	})
 }

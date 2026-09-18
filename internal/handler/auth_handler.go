@@ -149,7 +149,8 @@ func CallbackHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 //
 // 规则（满足其一即可）：
 //  1. Casdoor 中该用户被标记为管理员（claims.IsAdmin）；
-//  2. 用户名在配置的超级管理员名单（Permission.AdminUsers，默认 ["admin"]）。
+//  2. 用户名在配置的超级管理员名单（Permission.AdminUsers，通过
+//     PERMISSION_ADMIN_USERS 环境变量配置，无代码内默认值）。
 func isAdminUser(svcCtx *svc.ServiceContext, claims *casdoor.Claims) bool {
 	if claims == nil {
 		return false

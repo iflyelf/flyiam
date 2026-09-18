@@ -165,15 +165,18 @@ func (c *Config) ApplyEnvOverrides() {
 	}
 
 	// Permission AdminUsers 支持环境变量（逗号分隔）
+	//
+	// 无代码内默认值：不硬编码任何用户名。超级管理员可由两种途径产生：
+	//  1. Casdoor 中该用户被标记为管理员（isAdmin），登录时由 Casdoor 权威返回；
+	//  2. 通过 PERMISSION_ADMIN_USERS 显式配置的超级管理员名单。
 	if v := os.Getenv("PERMISSION_ADMIN_USERS"); v != "" {
 		c.Permission.AdminUsers = splitAndTrim(v)
 	}
-	// 默认至少包含 admin，避免无人可管理
-	if len(c.Permission.AdminUsers) == 0 {
-		c.Permission.AdminUsers = []string{"admin"}
-	}
 
 	// 受保护用户支持环境变量（逗号分隔）
+	//
+	// 同样无代码内默认值，避免硬编码具体账号。系统内置管理员账号
+	// （bootstrap 创建的 <组织>/admin）在客户端层始终受保护，不依赖此列表。
 	if v := os.Getenv("CASDOOR_PROTECTED_USERS"); v != "" {
 		c.Casdoor.ProtectedUsers = splitAndTrim(v)
 	}
@@ -181,11 +184,6 @@ func (c *Config) ApplyEnvOverrides() {
 	// 回调地址主机白名单支持环境变量（逗号分隔）
 	if v := os.Getenv("CASDOOR_ALLOWED_REDIRECT_HOSTS"); v != "" {
 		c.Casdoor.AllowedRedirectHosts = splitAndTrim(v)
-	}
-
-	// 受保护用户默认值（至少包含 admin，避免误删管理员）
-	if len(c.Casdoor.ProtectedUsers) == 0 {
-		c.Casdoor.ProtectedUsers = []string{"admin"}
 	}
 }
 

@@ -82,7 +82,9 @@ Casdoor:
   ApplicationDisplayName: FlyIAM      # （环境变量: CASDOOR_APPLICATION_DISPLAY_NAME）
   
   # 用户初始密码配置（环境变量: CASDOOR_DEFAULT_PASSWORD）
-  DefaultPassword: "ysyh!9Sky"
+  # 默认密码：必须显式设置（环境变量 CASDOOR_DEFAULT_PASSWORD / Secret）。
+  # 不提供内置默认值，留空将导致启动校验失败，避免弱口令被静默沿用。
+  DefaultPassword: ""
   # 用户手机号所属国家/地区代码（ISO 3166-1 alpha-2，环境变量: CASDOOR_COUNTRY_CODE）
   CountryCode: "CN"
   # 用户列表内存缓存时长（秒），降低 Casdoor 全量查询压力（环境变量: CASDOOR_USER_CACHE_TTL）
@@ -93,8 +95,9 @@ Casdoor:
   AutoRedirectURI: true
   # 应用回调地址白名单（留空则登录时按访问域名自动追加）
   RedirectURIs: []
-  # 受保护用户（域账号），同步与删除时跳过
-  ProtectedUsers: ["admin", "junwang66"]
+  # 受保护用户（域账号），同步与删除时跳过（环境变量: CASDOOR_PROTECTED_USERS，逗号分隔）。
+  # 内置管理员账号（<组织>/admin）在程序内始终受保护，无需在此重复配置。
+  ProtectedUsers: []
 
 # -----------------------------------------------------------------------------
 # Redis 缓存配置（外置，可选）
@@ -134,7 +137,9 @@ Audit:
 Permission:
   EnableRBAC: true                    # 是否启用 RBAC 权限控制（环境变量: PERMISSION_ENABLE_RBAC）
   DefaultRole: "user"                 # 新用户默认角色（环境变量: PERMISSION_DEFAULT_ROLE）
-  AdminUsers: ["admin"]               # 管理员用户列表（环境变量: PERMISSION_ADMIN_USERS，逗号分隔）
+  # 超级管理员名单（可选，环境变量: PERMISSION_ADMIN_USERS，逗号分隔）。
+  # 留空时不硬编码任何用户：Casdoor 中标记为管理员的账号（isAdmin）即为超级管理员。
+  AdminUsers: []
 
 # =============================================================================
 # 数据源配置（插件式架构）
