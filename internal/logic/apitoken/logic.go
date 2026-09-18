@@ -72,6 +72,14 @@ func (l *Logic) Create(ctx context.Context, username, name string, expiresInDays
 		expiresAt = &t
 	}
 
+	// 注意：不能把 (*time.Time)(nil) 直接作为 SQL 参数传给 go-zero sqlx：
+	// 其 sqlx.writeValue 对 `case *time.Time` 会调用 v.String()，
+	// nil 指针会 panic（表现为接口 500 空响应）。永久有效（nil）时传无类型 nil。
+	var expiresArg any
+	if expiresAt != nil {
+		expiresArg = *expiresAt
+	}
+
 	prefix := token
 	if len(prefix) > 16 {
 		prefix = prefix[:16] + "..."
@@ -80,7 +88,7 @@ func (l *Logic) Create(ctx context.Context, username, name string, expiresInDays
 	var id int64
 	query := `INSERT INTO api_tokens (username, name, token_hash, token_prefix, expires_at, enabled, created_at)
 		VALUES ($1,$2,$3,$4,$5,TRUE,NOW()) RETURNING id`
-	if err := l.db.QueryRowCtx(ctx, &id, query, username, name, hashToken(token), prefix, expiresAt); err != nil {
+	if err := l.db.QueryRowCtx(ctx, &id, query, username, name, hashToken(token), prefix, expiresArg); err != nil {
 		return "", nil, fmt.Errorf("保存令牌失败: %w", err)
 	}
 

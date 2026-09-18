@@ -119,7 +119,7 @@ const load = async () => {
   loading.value = true
   try {
     const res = await listTokens()
-    list.value = res || []
+    list.value = res.data || []
   } finally {
     loading.value = false
   }
@@ -131,10 +131,18 @@ const openCreate = () => {
 }
 
 const handleCreate = async () => {
+  if (!form.value.name || !form.value.name.trim()) {
+    ElMessage.warning('请填写令牌名称')
+    return
+  }
   saving.value = true
   try {
     const res = await createToken(form.value)
-    createdToken.value = res?.token || ''
+    createdToken.value = res.data?.token || ''
+    if (!createdToken.value) {
+      ElMessage.error('生成失败：未返回令牌')
+      return
+    }
     formVisible.value = false
     resultVisible.value = true
     load()

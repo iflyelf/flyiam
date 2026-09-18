@@ -130,7 +130,7 @@ const groupedSettings = computed(() => {
 const loadSettings = async () => {
   try {
     const res = await listSettings()
-    settingsItems.value = res || []
+    settingsItems.value = res.data || []
     const form = {}
     for (const it of settingsItems.value) {
       form[it.key] = it.type === 'bool' ? it.value === 'true' : it.value
