@@ -264,13 +264,16 @@ jobs:
       # 华为云 SWR 镜像仓库默认私有，push 后调用 SWR API 设为公开
       # 需 Secrets: SWR_AK / SWR_SK（华为云账号 AK/SK，具备 swr:repo:updateRepo 权限）
       - name: 设置 SWR 镜像为公开
-        if: ${{ secrets.SWR_AK != '' && secrets.SWR_SK != '' }}
         env:
           CLOUD_SDK_AK: ${{ secrets.SWR_AK }}
           CLOUD_SDK_SK: ${{ secrets.SWR_SK }}
           SWR_REGION: cn-east-3
           SWR_ORGANIZATION: ${{ env.SWR_ORGANIZATION }}
         run: |
+          if [ -z "$CLOUD_SDK_AK" ] || [ -z "$CLOUD_SDK_SK" ]; then
+            echo "未配置 SWR_AK / SWR_SK，跳过设置公开"
+            exit 0
+          fi
           pip install --quiet huaweicloudsdkcore huaweicloudsdkswr
           python - <<'PY'
           import os
