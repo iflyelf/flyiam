@@ -5,8 +5,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html"
 	"log"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -138,9 +140,12 @@ func CallbackHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 
-		// 跳转前端回调页，携带本地 token
+		// 跳转前端回调页，携带本地 token（全部做 URL 编码，避免注入额外参数）
 		target := fmt.Sprintf("/callback?token=%s&name=%s&displayName=%s&email=%s",
-			localToken, claims.Name, claims.DisplayName, claims.Email)
+			url.QueryEscape(localToken),
+			url.QueryEscape(claims.Name),
+			url.QueryEscape(claims.DisplayName),
+			url.QueryEscape(claims.Email))
 		http.Redirect(w, r, target, http.StatusFound)
 	}
 }
@@ -162,7 +167,10 @@ func isAdminUser(svcCtx *svc.ServiceContext, claims *casdoor.Claims) bool {
 	return logic.IsSuperAdmin(claims.Name)
 }
 
-// denyLogin 拒绝登录：浏览器跳转场景返回可读的提示页（非 JSON）
+// denyLogin 拒绝登录：浏览器跳转场景返回可读的提示页（非 JSON）。
+//
+// title/message 可能包含来自 Casdoor 的用户可控内容（如显示名），
+// 必须转义后再拼入 HTML，避免反射型 XSS。
 func denyLogin(w http.ResponseWriter, r *http.Request, title, message string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusForbidden)
@@ -175,7 +183,7 @@ h1{font-size:20px;margin:0 0 12px;color:#c0392b}p{color:#555;line-height:1.7;mar
 a{display:inline-block;padding:8px 20px;background:#2f6fed;color:#fff;text-decoration:none;border-radius:8px}</style>
 </head>
 <body><div class="box"><h1>%s</h1><p>%s</p><a href="/login">返回登录</a></div></body>
-</html>`, title, title, message)
+</html>`, html.EscapeString(title), html.EscapeString(title), html.EscapeString(message))
 }
 
 // UserInfoHandler 返回当前登录用户信息（含有效权限列表）
@@ -291,10 +299,12 @@ func signLocalToken(svcCtx *svc.ServiceContext, claims *casdoor.Claims) (string,
 }
 
 // parseLocalToken 解析本地 JWT
+//
+// 限定签名算法为 HS256，避免算法混淆攻击。
 func parseLocalToken(svcCtx *svc.ServiceContext, tokenStr string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		return []byte(svcCtx.Config.JWT.Secret), nil
-	})
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 	if err != nil || !token.Valid {
 		return nil, fmt.Errorf("无效 Token")
 	}

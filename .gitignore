@@ -84,3 +84,6 @@ yarn-error.log*
 etc/config-local.yaml
 etc/config-local.yml
 config-local.yaml
+.env.*
+!.env.example
+!.env.sample

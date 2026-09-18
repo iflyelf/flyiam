@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
@@ -73,8 +74,70 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	}
 }
 
+// ensureDatabase 确保目标数据库存在（首次部署时自动创建）。
+//
+// 先尝试连接目标库；若因「库不存在」（SQLSTATE 3D000）失败，则连接 postgres
+// 维护库执行 CREATE DATABASE。权限不足或其它错误时仅告警，由后续连接给出明确报错。
+func ensureDatabase(c config.Config) {
+	probe, err := sql.Open("postgres", c.GetDSN())
+	if err == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		pingErr := probe.PingContext(ctx)
+		cancel()
+		probe.Close()
+		if pingErr == nil {
+			return // 目标库已存在且可连
+		}
+		// 仅对「库不存在」做自动创建，其它错误（密码错/网络不通）不掩盖
+		if !isDatabaseNotExist(pingErr) {
+			return
+		}
+	}
+
+	admin, err := sql.Open("postgres", c.MaintenanceDSN())
+	if err != nil {
+		log.Printf("⚠️ 自动建库：无法连接维护库，请确认数据库 %q 已创建: %v", c.Database.DBName, err)
+		return
+	}
+	defer admin.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := admin.PingContext(ctx); err != nil {
+		log.Printf("⚠️ 自动建库：维护库不可达，请确认数据库 %q 已创建: %v", c.Database.DBName, err)
+		return
+	}
+
+	stmt := fmt.Sprintf("CREATE DATABASE %s", quoteIdent(c.Database.DBName))
+	if _, err := admin.ExecContext(ctx, stmt); err != nil {
+		// 并发建库时可能已被其它副本创建（42P04 duplicate_database），视为成功
+		if strings.Contains(strings.ToLower(err.Error()), "already exists") {
+			return
+		}
+		log.Printf("⚠️ 自动建库失败（可能权限不足），请确认数据库 %q 已创建: %v", c.Database.DBName, err)
+		return
+	}
+	log.Printf("✅ 已自动创建数据库: %s", c.Database.DBName)
+}
+
+// isDatabaseNotExist 判断错误是否为「数据库不存在」（PostgreSQL SQLSTATE 3D000）
+func isDatabaseNotExist(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "does not exist") && strings.Contains(msg, "database")
+}
+
+// quoteIdent 为标识符加双引号（防注入），内部双引号转义
+func quoteIdent(name string) string {
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
 // initDB 初始化数据库连接
 func initDB(c config.Config) *sql.DB {
+	ensureDatabase(c)
+
 	dsn := c.GetDSN()
 
 	db, err := sql.Open("postgres", dsn)
@@ -99,20 +162,67 @@ func initDB(c config.Config) *sql.DB {
 	return db
 }
 
+// schemaLockKey flyiam 建表 advisory lock 键（固定值，保证多副本互斥）
+const schemaLockKey int64 = 0x666C7969616D01 // "flyiam\x01"
+
+// acquireSchemaLock 获取会话级 advisory lock；返回持有锁的连接（调用方负责释放）
+func acquireSchemaLock(db *sql.DB) (*sql.Conn, error) {
+	conn, err := db.Conn(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", schemaLockKey); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	return conn, nil
+}
+
+// releaseSchemaLock 释放 advisory lock 并关闭连接
+func releaseSchemaLock(conn *sql.Conn) {
+	if conn == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, _ = conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", schemaLockKey)
+	_ = conn.Close()
+}
+
+// warnLegacyTables 检测废弃的本地用户表，仅告警不删除
+func warnLegacyTables(db *sql.DB) {
+	for _, t := range []string{"users", "resigned_users", "departments"} {
+		var exists bool
+		err := db.QueryRow(`SELECT EXISTS (SELECT 1 FROM information_schema.tables
+			WHERE table_schema='public' AND table_name=$1)`, t).Scan(&exists)
+		if err == nil && exists {
+			log.Printf("ℹ️ 检测到历史遗留表 %q（已废弃，程序不再读写）；如确认无用可手工 DROP TABLE %s", t, t)
+		}
+	}
+}
+
 // initSchema 初始化数据库表结构
 func initSchema(db *sql.DB, c config.Config) error {
 	log.Println("🔧 初始化数据库表结构...")
 
-	// 本系统不存储任何用户数据（用户唯一存储于 Casdoor）。
-	// 清理历史版本遗留的本地用户相关表，避免数据双写与不一致。
-	dropLegacy := `
-	DROP TABLE IF EXISTS users;
-	DROP TABLE IF EXISTS resigned_users;
-	DROP TABLE IF EXISTS departments;
-	`
-	if _, err := db.Exec(dropLegacy); err != nil {
-		return fmt.Errorf("清理本地用户表失败: %w", err)
+	// 多副本并发 DDL 会触发 PostgreSQL 建表/建索引竞态
+	// （duplicate key on pg_type_typname_nsp_index / relation already exists），
+	// 用会话级 advisory lock 串行化初始化；连接归还后锁自动释放。
+	if lockConn, err := acquireSchemaLock(db); err != nil {
+		log.Printf("⚠️ 获取建表锁失败（继续执行，多副本下可能偶发竞态）: %v", err)
+	} else {
+		defer releaseSchemaLock(lockConn)
 	}
+
+	// 本系统不存储任何用户数据（用户唯一存储于 Casdoor）。
+	//
+	// 历史版本的 users / resigned_users / departments 已废弃，程序不再读写。
+	// 注意：不再每次启动无条件 DROP —— 那会导致旧库历史数据不可逆丢失，
+	// 且若存在外键引用还会使 DROP 失败、启动中断。此处仅在检测到这些表
+	// 仍存在时给出提示，由管理员确认后自行清理。
+	warnLegacyTables(db)
 
 	// 创建同步日志表
 	if err := createSyncLogsTable(db); err != nil {

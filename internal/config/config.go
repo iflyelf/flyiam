@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -249,4 +251,32 @@ func (c *Config) GetDSN() string {
 		c.Database.DBName,
 		c.Database.SSLMode,
 	)
+}
+
+// MaintenanceDSN 返回连接 postgres 维护库的连接串（用于首次自动建库）。
+//
+// 目标库尚不存在时，普通连接无法建立，需先连到 postgres 库执行 CREATE DATABASE。
+func (c *Config) MaintenanceDSN() string {
+	if c.Database.DSN != "" {
+		return replaceDBNameInDSN(c.Database.DSN, "postgres")
+	}
+	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=postgres sslmode=%s",
+		c.Database.Host, c.Database.Port, c.Database.User, c.Database.Password, c.Database.SSLMode)
+}
+
+// replaceDBNameInDSN 将 DSN 中的库名替换为指定值，兼容 URL 与 key=value 两种格式。
+func replaceDBNameInDSN(dsn, dbName string) string {
+	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+		if u, err := url.Parse(dsn); err == nil {
+			u.Path = "/" + dbName
+			return u.String()
+		}
+		return dsn
+	}
+	// key=value 形式：替换 dbname=xxx
+	re := regexp.MustCompile(`(^|\s)dbname=[^\s]+`)
+	if re.MatchString(dsn) {
+		return re.ReplaceAllString(dsn, "${1}dbname="+dbName)
+	}
+	return dsn + " dbname=" + dbName
 }

@@ -12,6 +12,26 @@ import (
 	"github.com/zeromicro/go-zero/rest/pathvar"
 )
 
+// maskedSecret 敏感字段回显占位符（提交该值表示「保持原值不变」）
+const maskedSecret = "******"
+
+// maskDataSource 脱敏数据源敏感字段（认证 Token / 密码）后再返回。
+//
+// 这些字段仅需写入，不应经接口回显；编辑时提交占位符即保持原值。
+func maskDataSource(cfg *model.DataSourceConfig) *model.DataSourceConfig {
+	if cfg == nil {
+		return nil
+	}
+	masked := *cfg
+	if masked.AuthToken != "" {
+		masked.AuthToken = maskedSecret
+	}
+	if masked.AuthPassword != "" {
+		masked.AuthPassword = maskedSecret
+	}
+	return &masked
+}
+
 // ListDataSourcesHandler 数据源列表
 func ListDataSourcesHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -21,7 +41,11 @@ func ListDataSourcesHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			fail(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		ok(w, list)
+		out := make([]*model.DataSourceConfig, 0, len(list))
+		for _, cfg := range list {
+			out = append(out, maskDataSource(cfg))
+		}
+		ok(w, out)
 	}
 }
 
@@ -42,7 +66,7 @@ func CreateDataSourceHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 		cfg.ID = id
-		ok(w, cfg)
+		ok(w, maskDataSource(cfg))
 	}
 }
 
@@ -63,11 +87,22 @@ func UpdateDataSourceHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		normalizeDataSource(cfg)
 
 		logic := datasource.NewLogic(svcCtx.DB)
+		// 提交的敏感字段为掩码占位符时，保留原值（前端编辑未修改密钥的场景）
+		if cfg.AuthToken == maskedSecret || cfg.AuthPassword == maskedSecret {
+			if old, gerr := logic.Get(r.Context(), id); gerr == nil && old != nil {
+				if cfg.AuthToken == maskedSecret {
+					cfg.AuthToken = old.AuthToken
+				}
+				if cfg.AuthPassword == maskedSecret {
+					cfg.AuthPassword = old.AuthPassword
+				}
+			}
+		}
 		if err := logic.Update(r.Context(), cfg); err != nil {
 			fail(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		ok(w, cfg)
+		ok(w, maskDataSource(cfg))
 	}
 }
 

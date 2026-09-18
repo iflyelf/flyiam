@@ -101,10 +101,13 @@ func extractToken(r *http.Request) string {
 }
 
 // parseToken 解析本地 JWT
+//
+// 使用 WithValidMethods 限定仅接受 HS256，避免算法混淆
+// （如 alg=none 或 RS256 公钥被当作 HMAC 密钥）。
 func parseToken(secret, tokenStr string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		return []byte(secret), nil
-	})
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 	if err != nil || !token.Valid {
 		return nil, err
 	}

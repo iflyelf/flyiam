@@ -105,7 +105,7 @@ charts/flyiam/
 | `FLYIAM_CASDOOR_ENDPOINT` | Casdoor 后端地址（集群内） | `http://casdoor:8000` |
 | `FLYIAM_CASDOOR_PUBLIC_ENDPOINT` | Casdoor 浏览器地址（外置域名，标准端口 80/443） | - |
 | `FLYIAM_CASDOOR_AUTO_SETUP` | 自动初始化 Casdoor | `true` |
-| `FLYIAM_CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码（生产必须覆盖） | `ysyh!9Sky` |
+| `FLYIAM_CASDOOR_DEFAULT_PASSWORD` | 新用户默认密码（**必填**） | - |
 | `FLYIAM_PERMISSION_ADMIN_USERS` | 超级管理员名单（逗号分隔） | 空（依赖 Casdoor `isAdmin`） |
 | `FLYIAM_CASDOOR_PROTECTED_USERS` | 受保护用户（逗号分隔，同步/删除时跳过） | 空（`<组织>/admin` 始终受保护） |
 | `FLYIAM_CASDOOR_ALLOWED_REDIRECT_HOSTS` | 回调地址主机白名单（逗号分隔） | 空 |
@@ -119,6 +119,10 @@ charts/flyiam/
 | `CASDOOR_TIMEZONE` | Casdoor 时区 | `Asia/Shanghai` |
 
 > Chart 仅暴露 ClusterIP Service，不包含 Ingress；域名/HTTPS 请在集群入口层（Ingress Controller / Gateway）统一配置。
+
+> ⚠️ **敏感值不再提供内置默认口令**：`FLYIAM_DB_PASSWORD`、`FLYIAM_REDIS_PASSWORD`、
+> `FLYIAM_JWT_SECRET`、`FLYIAM_ADMIN_PASSWORD`、`FLYIAM_CASDOOR_DEFAULT_PASSWORD`
+> 均需显式设置（环境变量或 `existingSecret`），否则部署前置检查/启动校验会失败。
 
 > **Service 选择器（重要）**：应用与内置 Casdoor 的 Pod 都带有 `app.kubernetes.io/name=flyiam`，
 > 因此两个 Service 必须用 `app.kubernetes.io/component` 区分：
