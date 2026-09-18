@@ -109,6 +109,10 @@ charts/flyiam/
 | `FLYIAM_PERMISSION_ADMIN_USERS` | 超级管理员名单（逗号分隔） | 空（依赖 Casdoor `isAdmin`） |
 | `FLYIAM_CASDOOR_PROTECTED_USERS` | 受保护用户（逗号分隔，同步/删除时跳过） | 空（`<组织>/admin` 始终受保护） |
 | `FLYIAM_CASDOOR_ALLOWED_REDIRECT_HOSTS` | 回调地址主机白名单（逗号分隔） | 空 |
+| `FLYIAM_AUTH_COOKIE_SAMESITE` | 登录 Cookie SameSite（跨域需 `none`） | `lax` |
+| `FLYIAM_AUTH_COOKIE_SECURE` | 登录 Cookie Secure（`auto`/`true`/`false`） | `auto` |
+| `FLYIAM_AUTH_COOKIE_DOMAIN` | 登录 Cookie 作用域（跨子域共享） | 空 |
+| `FLYIAM_CORS_ALLOWED_ORIGINS` | 允许的跨域来源（逗号分隔，为空关闭） | 空 |
 | `CASDOOR_ENABLED` | 部署内置 Casdoor | `true` |
 | `CASDOOR_REPLICAS` | Casdoor 副本数 | `2` |
 | `CASDOOR_REDIS_SESSION_ENABLED` | Casdoor 会话是否用 Redis 共享（多副本必须开启） | 跟随 `FLYIAM_REDIS_ENABLED`（默认 `true`） |

@@ -204,6 +204,21 @@ logLevel: '{{ env "FLYIAM_LOG_LEVEL" | default "info" }}'
 # 日志格式（json / text）
 logFormat: '{{ env "FLYIAM_LOG_FORMAT" | default "json" }}'
 
+# ==================== 安全与跨域配置 ====================
+# 登录 Cookie 的 SameSite 策略：lax / strict / none
+#   同源部署（前端嵌入后端，默认）用 lax；
+#   前后端跨域部署必须 none（同时需 HTTPS）。
+authCookieSameSite: '{{ env "FLYIAM_AUTH_COOKIE_SAMESITE" | default "lax" }}'
+# 登录 Cookie 是否仅 HTTPS 发送：auto / true / false
+#   auto：SameSite=none 时强制 true，否则按请求协议自动判断。
+authCookieSecure: '{{ env "FLYIAM_AUTH_COOKIE_SECURE" | default "auto" }}'
+# 登录 Cookie 作用域（跨子域共享时设为 .example.com），留空为当前域
+authCookieDomain: '{{ env "FLYIAM_AUTH_COOKIE_DOMAIN" | default "" }}'
+# 允许的跨域来源（逗号分隔，精确匹配；为空则关闭跨域）。
+#   仅当前端与后端不同源时填写；不能使用 *（跨域携带 Cookie 需具体来源）。
+#   例：https://flyiam.example.com
+corsAllowedOrigins: '{{ env "FLYIAM_CORS_ALLOWED_ORIGINS" | default "" }}'
+
 # ==================== 节点调度配置 ====================
 # 节点标签（用于节点亲和性）
 nodeLabel: '{{ env "FLYIAM_NODE_LABEL" | default "flyiam" }}'

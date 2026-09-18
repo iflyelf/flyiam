@@ -27,6 +27,15 @@ type ServiceContext struct {
 	ProtectedLogic *protected.Logic
 }
 
+// CookieConfig 返回登录 Cookie 配置（来自 config.Security）
+func (s *ServiceContext) CookieConfig() config.CookieConfig {
+	return config.CookieConfig{
+		SameSite: s.Config.Security.CookieSameSite,
+		Secure:   s.Config.Security.CookieSecure,
+		Domain:   s.Config.Security.CookieDomain,
+	}
+}
+
 // NewServiceContext 创建服务上下文
 func NewServiceContext(c config.Config) *ServiceContext {
 	// 初始化数据库连接

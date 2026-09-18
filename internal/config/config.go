@@ -94,6 +94,23 @@ type Config struct {
 		StaticDir string `json:",default=./web/dist,env=WEB_STATIC_DIR"`
 	}
 
+	// Security 登录凭证与跨域相关配置
+	Security struct {
+		// CookieSameSite 登录 Cookie 的 SameSite 策略：lax / strict / none
+		//   同源部署用 lax（默认，更安全）；
+		//   前后端跨域部署必须 none（且需 HTTPS + Secure）。
+		CookieSameSite string `json:",default=lax,env=AUTH_COOKIE_SAMESITE"`
+		// CookieSecure 是否仅通过 HTTPS 发送：auto / true / false
+		//   auto（默认）：按请求是否 TLS / X-Forwarded-Proto 自动判断；
+		//   SameSite=none 时浏览器强制要求 Secure，此时自动视为 true。
+		CookieSecure string `json:",default=auto,env=AUTH_COOKIE_SECURE"`
+		// CookieDomain Cookie 作用域（跨子域共享时设为 .example.com），默认当前域
+		CookieDomain string `json:",optional,env=AUTH_COOKIE_DOMAIN"`
+		// CORSAllowedOrigins 允许的跨域来源（逗号分隔，精确匹配）。
+		//   为空则不启用跨域；跨域时必须显式列出来源（不能用 *）。
+		CORSAllowedOrigins []string `json:",optional"`
+	}
+
 	LogConfig struct {
 		Level  string `json:",default=info,env=LOG_LEVEL"`
 		Format string `json:",default=json,env=LOG_FORMAT"`
@@ -186,6 +203,11 @@ func (c *Config) ApplyEnvOverrides() {
 	// 回调地址主机白名单支持环境变量（逗号分隔）
 	if v := os.Getenv("CASDOOR_ALLOWED_REDIRECT_HOSTS"); v != "" {
 		c.Casdoor.AllowedRedirectHosts = splitAndTrim(v)
+	}
+
+	// 跨域来源白名单支持环境变量（逗号分隔）
+	if v := os.Getenv("CORS_ALLOWED_ORIGINS"); v != "" {
+		c.Security.CORSAllowedOrigins = splitAndTrim(v)
 	}
 }
 

@@ -130,6 +130,11 @@ releases:
       # 日志配置
       - logLevel: {{ .Values.logLevel | quote }}
       - logFormat: {{ .Values.logFormat | quote }}
+      # 安全与跨域配置
+      - authCookieSameSite: {{ .Values.authCookieSameSite | quote }}
+      - authCookieSecure: {{ .Values.authCookieSecure | quote }}
+      - authCookieDomain: {{ .Values.authCookieDomain | quote }}
+      - corsAllowedOrigins: {{ .Values.corsAllowedOrigins | quote }}
       # 节点调度配置（硬性节点亲和性）
       - nodeLabel: {{ .Values.nodeLabel | quote }}
       - nodeLabelValue: {{ .Values.nodeLabelValue | quote }}

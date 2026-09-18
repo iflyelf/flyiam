@@ -69,16 +69,9 @@ func LoginHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		}
 
 		// 生成随机 state 并写入 Cookie，回调时校验，防止登录 CSRF
+		cookieCfg := svcCtx.CookieConfig()
 		state := randomState()
-		http.SetCookie(w, &http.Cookie{
-			Name:     oauthStateCookie,
-			Value:    state,
-			Path:     "/",
-			MaxAge:   600,
-			HttpOnly: true,
-			SameSite: http.SameSiteLaxMode,
-			Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
-		})
+		http.SetCookie(w, cookieCfg.NewAuthCookie(oauthStateCookie, state, 600, r))
 
 		loginURL := svcCtx.CasdoorClient.GetSigninUrl(redirectUri, state)
 
@@ -142,7 +135,8 @@ func CallbackHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 
 		// 登录凭证写入 HttpOnly Cookie（JS 不可读，降低 XSS 窃取风险），
 		// 前端不再需要接触 token。
-		setAuthCookie(w, r, localToken, svcCtx.Config.JWT.AccessExpire)
+		cookieCfg := svcCtx.CookieConfig()
+		http.SetCookie(w, cookieCfg.NewAuthCookie(middleware.AuthCookieName, localToken, svcCtx.Config.JWT.AccessExpire, r))
 
 		// 仅携带非敏感展示信息跳转前端回调页（token 不再出现在 URL）
 		target := fmt.Sprintf("/callback?name=%s&displayName=%s&email=%s",
@@ -153,33 +147,10 @@ func CallbackHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	}
 }
 
-// setAuthCookie 写入登录凭证 Cookie
-func setAuthCookie(w http.ResponseWriter, r *http.Request, token string, maxAge int) {
-	if maxAge <= 0 {
-		maxAge = 7200
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     middleware.AuthCookieName,
-		Value:    token,
-		Path:     "/",
-		MaxAge:   maxAge,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
-	})
-}
-
 // LogoutHandler 退出登录：清除登录 Cookie
 func LogoutHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		http.SetCookie(w, &http.Cookie{
-			Name:     middleware.AuthCookieName,
-			Value:    "",
-			Path:     "/",
-			MaxAge:   -1,
-			HttpOnly: true,
-			SameSite: http.SameSiteLaxMode,
-		})
+		http.SetCookie(w, svcCtx.CookieConfig().ClearAuthCookie(middleware.AuthCookieName))
 		ok(w, nil)
 	}
 }

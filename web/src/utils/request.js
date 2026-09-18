@@ -1,10 +1,12 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { API_BASE } from '@/config/api'
 
-// 同源请求（生产环境前后端一体，开发环境由 Vite 代理 /api）
+// 同源请求（生产环境前后端一体，开发环境由 Vite 代理 /api）；
+// 跨域部署时由 VITE_API_BASE_URL 指定后端地址。
 // 登录凭证由后端 HttpOnly Cookie 承载，浏览器自动携带，前端不保存 token。
 const request = axios.create({
-  baseURL: '',
+  baseURL: API_BASE,
   timeout: 120000,
   withCredentials: true
 })

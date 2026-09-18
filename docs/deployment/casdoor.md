@@ -129,10 +129,39 @@ helmfile sync
 
   非空时，仅白名单内主机的回调会被自动追加；为空时保持原行为并打印告警。
 
-## 3.0.2 默认密码（必填）
+## 3.0.2 默认密码
 
-`CASDOOR_DEFAULT_PASSWORD` **不再提供代码内默认值**，必须显式注入
-（环境变量 / Secret），否则启动即失败。新增用户与重置密码均使用该值。
+`CASDOOR_DEFAULT_PASSWORD` 用于新增用户与重置密码，**生产环境请务必覆盖**
+（Chart 默认值为 `ysyh!9Sky`，仅便于快速开始）。
+
+## 3.0.3 跨域部署（前后端不同源）
+
+默认前后端**同源**（前端构建产物嵌入后端二进制，同一端口），此时
+`SameSite=Lax` 即可，无需任何额外配置。
+
+仅当把前端与后端部署到**不同域名**时，才需要配置以下三项：
+
+**1. 前端构建**（指定后端地址）：
+```bash
+export VITE_API_BASE_URL="https://flyiam-api.example.com"
+cd web && npm run build
+```
+
+**2. 后端 Cookie**（必须 None + HTTPS）：
+```bash
+export FLYIAM_AUTH_COOKIE_SAMESITE="none"
+# Secure：SameSite=none 时自动置 true（也可显式 AUTH_COOKIE_SECURE=true）
+# 跨子域共享时：export FLYIAM_AUTH_COOKIE_DOMAIN=".example.com"
+```
+
+**3. 后端 CORS**（显式列出来源，不能用 `*`）：
+```bash
+export FLYIAM_CORS_ALLOWED_ORIGINS="https://flyiam.example.com"
+```
+配置后 go-zero 会自动下发 `Access-Control-Allow-Origin` 与
+`Access-Control-Allow-Credentials: true`，允许跨域携带登录 Cookie。
+
+> ⚠️ `SameSite=None` 会削弱 CSRF 防护，非跨域部署请保持默认 `lax`。
 
 ## 3.1 权限模型：应用 / 组织管理需内置应用凭据
 

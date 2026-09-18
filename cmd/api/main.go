@@ -69,13 +69,23 @@ func main() {
 
 	// 创建 REST 服务器
 	// 关键：未匹配的请求交给 SPA 处理器，用于提供前端静态文件与前端路由回退
-	server := rest.MustNewServer(c.RestConf, rest.WithNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if c.Web.Embedded {
-			web.SPAHandler().ServeHTTP(w, r)
-		} else {
-			http.NotFound(w, r)
-		}
-	})))
+	opts := []rest.RunOption{
+		rest.WithNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if c.Web.Embedded {
+				web.SPAHandler().ServeHTTP(w, r)
+			} else {
+				http.NotFound(w, r)
+			}
+		})),
+	}
+	// 跨域支持：仅当前端与后端不同源时配置 CORS_ALLOWED_ORIGINS。
+	// go-zero 对具体 origin 会同时下发 Access-Control-Allow-Credentials: true，
+	// 从而允许跨域携带登录 Cookie（需配合 AUTH_COOKIE_SAMESITE=none + HTTPS）。
+	if len(c.Security.CORSAllowedOrigins) > 0 {
+		logx.Infof("已启用跨域访问，允许来源: %v", c.Security.CORSAllowedOrigins)
+		opts = append(opts, rest.WithCors(c.Security.CORSAllowedOrigins...))
+	}
+	server := rest.MustNewServer(c.RestConf, opts...)
 	defer server.Stop()
 
 	// 初始化服务上下文（数据库、Casdoor、缓存）

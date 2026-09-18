@@ -292,6 +292,20 @@ env:
   - name: LOG_FORMAT
     value: {{ .Values.logFormat | quote }}
 
+  # 安全与跨域配置
+  - name: AUTH_COOKIE_SAMESITE
+    value: {{ .Values.authCookieSameSite | quote }}
+  - name: AUTH_COOKIE_SECURE
+    value: {{ .Values.authCookieSecure | quote }}
+  {{- if .Values.authCookieDomain }}
+  - name: AUTH_COOKIE_DOMAIN
+    value: {{ .Values.authCookieDomain | quote }}
+  {{- end }}
+  {{- if .Values.corsAllowedOrigins }}
+  - name: CORS_ALLOWED_ORIGINS
+    value: {{ .Values.corsAllowedOrigins | quote }}
+  {{- end }}
+
 # ============================================
 # 敏感信息配置（从 Secret 注入）
 # ============================================
