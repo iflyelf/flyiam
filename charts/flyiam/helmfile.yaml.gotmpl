@@ -24,7 +24,6 @@ environments:
       - environment: development
       - replicas: 1
       - casdoorReplicas: 1
-      - logLevel: debug
   
   # 测试环境配置
   staging:
@@ -33,7 +32,6 @@ environments:
       - namespace: flyiam-staging
       - environment: staging
       - replicas: 2
-      - logLevel: info
   
   # 生产环境配置
   prod:
@@ -42,7 +40,6 @@ environments:
       - namespace: flyiam
       - environment: production
       - replicas: 3
-      - logLevel: warn
       - hpaEnabled: true
       - hpaMinReplicas: 3
       - hpaMaxReplicas: 10
@@ -100,14 +97,10 @@ releases:
       - redisHost: {{ .Values.redisHost | quote }}
       - redisPort: {{ .Values.redisPort }}
       - redisPassword: {{ .Values.redisPassword | quote }}
-      # JWT 配置
+      # JWT 密钥（过期/签发者等已页面可配置）
       - jwtSecret: {{ .Values.jwtSecret | quote }}
-      - jwtAccessExpire: {{ .Values.jwtAccessExpire }}
-      - jwtRefreshExpire: {{ .Values.jwtRefreshExpire }}
-      # 管理员配置
-      - adminUsername: {{ .Values.adminUsername | quote }}
+      # 管理员密码（用户名/邮箱已页面可配置）
       - adminPassword: {{ .Values.adminPassword | quote }}
-      - adminEmail: {{ .Values.adminEmail | quote }}
       # Casdoor 配置
       - casdoorEndpoint: {{ .Values.casdoorEndpoint | quote }}
       - casdoorPublicEndpoint: {{ .Values.casdoorPublicEndpoint | quote }}
@@ -127,15 +120,9 @@ releases:
       - resourcesRequestsMemory: {{ .Values.resourcesRequestsMemory | quote }}
       - resourcesLimitsCpu: {{ .Values.resourcesLimitsCpu | quote }}
       - resourcesLimitsMemory: {{ .Values.resourcesLimitsMemory | quote }}
-      # 日志配置
-      - logLevel: {{ .Values.logLevel | quote }}
-      - logFormat: {{ .Values.logFormat | quote }}
-      # 说明：安全/跨域/审计/权限/Casdoor 等已「页面可配置」（存数据库，DB 优先），
-      # Chart 不再逐项透传；服务间调用改用页面生成的 API 令牌（无需 SERVICE_TOKEN）。
-      - authCookieSameSite: {{ .Values.authCookieSameSite | quote }}
-      - authCookieSecure: {{ .Values.authCookieSecure | quote }}
-      - authCookieDomain: {{ .Values.authCookieDomain | quote }}
-      - corsAllowedOrigins: {{ .Values.corsAllowedOrigins | quote }}
+      # 说明：安全/跨域/审计/权限/日志/JWT 过期/管理员用户名邮箱/Casdoor 同步 等
+      # 已「页面可配置」（存数据库，DB 优先），Chart 不再逐项透传；
+      # 服务间调用改用页面生成的 API 令牌（无需 SERVICE_TOKEN）。
       # 节点调度配置（硬性节点亲和性）
       - nodeLabel: {{ .Values.nodeLabel | quote }}
       - nodeLabelValue: {{ .Values.nodeLabelValue | quote }}

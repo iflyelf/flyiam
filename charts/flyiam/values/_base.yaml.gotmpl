@@ -73,20 +73,12 @@ redisCacheTtl: {{ env "FLYIAM_REDIS_CACHE_TTL" | default "300" }}
 # ==================== JWT 配置 ====================
 # JWT 密钥（必填，建议 32 位以上随机字符串，生产环境必须使用 existingSecret）
 jwtSecret: '{{ env "FLYIAM_JWT_SECRET" | default "ysyh!9SkyFlyIAMSecretKey2024xxxxxxxx" }}'
-# JWT Access Token 过期时间（秒，默认 2 小时）
-jwtAccessExpire: {{ env "FLYIAM_JWT_ACCESS_EXPIRE" | default "7200" }}
-# JWT Refresh Token 过期时间（秒，默认 7 天）
-jwtRefreshExpire: {{ env "FLYIAM_JWT_REFRESH_EXPIRE" | default "604800" }}
-# JWT 签发者
-jwtIssuer: '{{ env "FLYIAM_JWT_ISSUER" | default "flyiam" }}'
 
-# ==================== 管理员配置 ====================
-# 管理员用户名
-adminUsername: '{{ env "FLYIAM_ADMIN_USERNAME" | default "admin" }}'
+# ==================== 管理员密码 ====================
 # 管理员密码（生产环境必须使用 existingSecret）
 adminPassword: '{{ env "FLYIAM_ADMIN_PASSWORD" | default "ysyh!9Sky" }}'
-# 管理员邮箱
-adminEmail: '{{ env "FLYIAM_ADMIN_EMAIL" | default "admin@example.com" }}'
+# 说明：JWT 过期/签发者、管理员用户名/邮箱、Casdoor 同步参数、审计、日志、
+# 安全/跨域等均可经「系统设置」页面配置（存数据库），不再由 Chart 注入。
 
 # ==================== Casdoor 部署配置（内置，随本 Chart 一起部署）====================
 # 是否部署内置 Casdoor（关闭则使用外部 Casdoor）
@@ -171,50 +163,7 @@ casdoorAutoRedirectUri: {{ env "FLYIAM_CASDOOR_AUTO_REDIRECT_URI" | default "tru
 
 # ==================== 数据源配置 ====================
 # 说明：数据源改为「页面管理」（存数据库），在「数据同步」页面配置，无需环境变量。
-
-# ==================== Casdoor 同步配置 ====================
-# 是否启用自动同步到 Casdoor
-casdoorSyncEnabled: {{ env "FLYIAM_CASDOOR_SYNC_ENABLED" | default "true" }}
-# 数据源同步后自动触发
-casdoorSyncAuto: {{ env "FLYIAM_CASDOOR_SYNC_AUTO" | default "true" }}
-# 批量同步大小
-casdoorSyncBatchSize: {{ env "FLYIAM_CASDOOR_SYNC_BATCH_SIZE" | default "50" }}
-# 失败重试次数
-casdoorSyncRetryTimes: {{ env "FLYIAM_CASDOOR_SYNC_RETRY_TIMES" | default "3" }}
-# 重试间隔（秒）
-casdoorSyncRetryInterval: {{ env "FLYIAM_CASDOOR_SYNC_RETRY_INTERVAL" | default "5" }}
-
-# ==================== 审计日志配置 ====================
-# 是否启用审计日志
-auditEnabled: {{ env "FLYIAM_AUDIT_ENABLED" | default "true" }}
-# 日志保留天数
-auditRetentionDays: {{ env "FLYIAM_AUDIT_RETENTION_DAYS" | default "90" }}
-
-# ==================== 日志配置 ====================
-# 日志级别（debug / info / warn / error）
-logLevel: '{{ env "FLYIAM_LOG_LEVEL" | default "info" }}'
-# 日志格式（json / text）
-logFormat: '{{ env "FLYIAM_LOG_FORMAT" | default "json" }}'
-
-# ==================== 服务间调用配置 ====================
-# 服务间调用凭证（供 Consul Manager 等同步用户字段定义）。
-# 留空则不开放 /api/user-fields/export 接口。
-serviceToken: '{{ env "FLYIAM_SERVICE_TOKEN" | default "" }}'
-
-# ==================== 安全与跨域配置 ====================
-# 登录 Cookie 的 SameSite 策略：lax / strict / none
-#   同源部署（前端嵌入后端，默认）用 lax；
-#   前后端跨域部署必须 none（同时需 HTTPS）。
-authCookieSameSite: '{{ env "FLYIAM_AUTH_COOKIE_SAMESITE" | default "lax" }}'
-# 登录 Cookie 是否仅 HTTPS 发送：auto / true / false
-#   auto：SameSite=none 时强制 true，否则按请求协议自动判断。
-authCookieSecure: '{{ env "FLYIAM_AUTH_COOKIE_SECURE" | default "auto" }}'
-# 登录 Cookie 作用域（跨子域共享时设为 .example.com），留空为当前域
-authCookieDomain: '{{ env "FLYIAM_AUTH_COOKIE_DOMAIN" | default "" }}'
-# 允许的跨域来源（逗号分隔，精确匹配；为空则关闭跨域）。
-#   仅当前端与后端不同源时填写；不能使用 *（跨域携带 Cookie 需具体来源）。
-#   例：https://flyiam.example.com
-corsAllowedOrigins: '{{ env "FLYIAM_CORS_ALLOWED_ORIGINS" | default "" }}'
+# 服务间调用令牌改用页面「API 令牌」生成，不再经环境变量注入。
 
 # ==================== 节点调度配置 ====================
 # 节点标签（用于节点亲和性）

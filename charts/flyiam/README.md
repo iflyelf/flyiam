@@ -109,13 +109,19 @@ charts/flyiam/
 | `FLYIAM_PERMISSION_ADMIN_USERS` | 超级管理员名单（逗号分隔） | 空（依赖 Casdoor `isAdmin`） |
 | `FLYIAM_CASDOOR_PROTECTED_USERS` | 受保护用户（逗号分隔，同步/删除时跳过） | 空（`<组织>/admin` 始终受保护） |
 | `FLYIAM_CASDOOR_ALLOWED_REDIRECT_HOSTS` | 回调地址主机白名单（逗号分隔） | 空 |
-| `FLYIAM_AUTH_COOKIE_SAMESITE` | 登录 Cookie SameSite（跨域需 `none`） | `lax` |
-| `FLYIAM_AUTH_COOKIE_SECURE` | 登录 Cookie Secure（`auto`/`true`/`false`） | `auto` |
-| `FLYIAM_AUTH_COOKIE_DOMAIN` | 登录 Cookie 作用域（跨子域共享） | 空 |
-| `FLYIAM_CORS_ALLOWED_ORIGINS` | 允许的跨域来源（逗号分隔，为空关闭） | 空 |
-| `FLYIAM_SERVICE_TOKEN` | 全局服务令牌（可选；推荐改用页面「API 令牌」，无需环境变量） | 空 |
-| `FLYIAM_CASDOOR_ENDPOINT` / `..._CLIENT_ID` / `..._CLIENT_SECRET` 等 | Casdoor 连接：**已支持「系统设置」页面配置并热重载**，环境变量仅作首次种子 | 见 `_base` |
-| `FLYIAM_AUTH_*` / `FLYIAM_CORS_ALLOWED_ORIGINS` / `FLYIAM_PERMISSION_ADMIN_USERS` / 审计 / 日志 / JWT | 安全、跨域、权限、审计、日志、JWT：**均可在「系统设置」页面配置**（DB 优先 / env 兜底） | 见 `_base` |
+
+> **引导必需（Chart 保留）**：`FLYIAM_DB_*`、`FLYIAM_REDIS_*`、`FLYIAM_JWT_SECRET`、
+> `FLYIAM_ADMIN_PASSWORD`、`FLYIAM_CASDOOR_ENDPOINT` / `_PUBLIC_ENDPOINT` /
+> `_ORGANIZATION` / `_APPLICATION` / `_CERTIFICATE` / `_DEFAULT_PASSWORD` /
+> `_AUTO_SETUP`，以及内置 Casdoor 部署参数（`CASDOOR_*`）。
+> 原因：登录、首次自动初始化与启动校验依赖它们，且登录前无法访问设置页。
+>
+> **页面可配置（已从 Chart 移除）**：安全/跨域、审计、权限、日志、JWT 过期/签发者、
+> 管理员用户名/邮箱、Casdoor 同步参数、服务间调用令牌等，均存于数据库
+> （**DB 优先 / env 兜底**），在「系统设置」页面修改后**保存即生效**，Pod 重启后仍生效。
+>
+> 其中 **Casdoor 连接**修改后会**原子热重载**客户端，**无需重启 Pod**；
+> 若重建失败（如地址不可达），配置已保存但旧客户端仍继续服务并提示错误。
 | `CASDOOR_ENABLED` | 部署内置 Casdoor | `true` |
 | `CASDOOR_REPLICAS` | Casdoor 副本数 | `2` |
 | `CASDOOR_REDIS_SESSION_ENABLED` | Casdoor 会话是否用 Redis 共享（多副本必须开启） | 跟随 `FLYIAM_REDIS_ENABLED`（默认 `true`） |

@@ -198,20 +198,10 @@ env:
   - name: REDIS_CACHE_TTL
     value: {{ .Values.redisCacheTtl | quote }}
   
-  # JWT 配置
-  - name: JWT_ACCESS_EXPIRE
-    value: {{ .Values.jwtAccessExpire | quote }}
-  - name: JWT_REFRESH_EXPIRE
-    value: {{ .Values.jwtRefreshExpire | quote }}
-  - name: JWT_ISSUER
-    value: {{ .Values.jwtIssuer | quote }}
-  
-  # 管理员配置
-  - name: ADMIN_USERNAME
-    value: {{ .Values.adminUsername | quote }}
-  - name: ADMIN_EMAIL
-    value: {{ .Values.adminEmail | quote }}
-  
+  # JWT 过期/签发者、管理员用户名/邮箱、Casdoor 同步参数、审计、日志、
+  # 安全/跨域等均已改为「页面可配置」（存数据库，DB 优先 / env 兜底），
+  # 不再经 Chart 注入；仅保留登录与首次启动引导必需的配置。
+
   # Casdoor 配置
   - name: CASDOOR_ENDPOINT
     value: {{ .Values.casdoorEndpoint | quote }}
@@ -250,45 +240,7 @@ env:
   - name: CASDOOR_AUTO_REDIRECT_URI
     value: {{ .Values.casdoorAutoRedirectUri | quote }}
   
-  # Casdoor 同步配置
-  - name: CASDOOR_SYNC_ENABLED
-    value: {{ .Values.casdoorSyncEnabled | quote }}
-  - name: CASDOOR_SYNC_AUTO
-    value: {{ .Values.casdoorSyncAuto | quote }}
-  - name: CASDOOR_SYNC_BATCH_SIZE
-    value: {{ .Values.casdoorSyncBatchSize | quote }}
-  - name: CASDOOR_SYNC_RETRY_TIMES
-    value: {{ .Values.casdoorSyncRetryTimes | quote }}
-  - name: CASDOOR_SYNC_RETRY_INTERVAL
-    value: {{ .Values.casdoorSyncRetryInterval | quote }}
-  
   # 数据源配置：已改为「页面管理」（存数据库），无需环境变量。
-
-  # 审计日志配置
-  - name: AUDIT_ENABLED
-    value: {{ .Values.auditEnabled | quote }}
-  - name: AUDIT_RETENTION_DAYS
-    value: {{ .Values.auditRetentionDays | quote }}
-  
-  # 日志配置
-  - name: LOG_LEVEL
-    value: {{ .Values.logLevel | quote }}
-  - name: LOG_FORMAT
-    value: {{ .Values.logFormat | quote }}
-
-  # 安全与跨域配置
-  - name: AUTH_COOKIE_SAMESITE
-    value: {{ .Values.authCookieSameSite | quote }}
-  - name: AUTH_COOKIE_SECURE
-    value: {{ .Values.authCookieSecure | quote }}
-  {{- if .Values.authCookieDomain }}
-  - name: AUTH_COOKIE_DOMAIN
-    value: {{ .Values.authCookieDomain | quote }}
-  {{- end }}
-  {{- if .Values.corsAllowedOrigins }}
-  - name: CORS_ALLOWED_ORIGINS
-    value: {{ .Values.corsAllowedOrigins | quote }}
-  {{- end }}
 
 # ============================================
 # 敏感信息配置（从 Secret 注入）
