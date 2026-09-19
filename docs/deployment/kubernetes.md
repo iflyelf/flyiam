@@ -159,7 +159,7 @@ Casdoor 与 FlyIAM **共用同一数据库**（表前缀 `casdoor_`），
 | `FLYIAM_NAMESPACE` | 命名空间 | `flyiam` |
 | `FLYIAM_REPLICAS` | 应用副本数 | `2` |
 | `FLYIAM_IMAGE_REGISTRY` | 应用镜像仓库（华为云，国内可访问） | `swr.cn-east-3.myhuaweicloud.com` |
-| `FLYIAM_IMAGE_REPOSITORY` | 应用镜像路径 | `danxiaonuo/flyiam` |
+| `FLYIAM_IMAGE_REPOSITORY` | 应用镜像路径 | `iflyelf/flyiam` |
 | `FLYIAM_IMAGE_TAG` | 应用镜像标签 | `latest` |
 | `FLYIAM_IMAGE_PULL_POLICY` | 应用镜像拉取策略 | `Always` |
 | `CASDOOR_IMAGE_PULL_POLICY` | Casdoor 镜像拉取策略 | `Always` |

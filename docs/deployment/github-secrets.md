@@ -34,7 +34,7 @@ Registry 与组织名在 `publish.yml` 顶部的 `env` 中配置，可直接修�
 ```yaml
 env:
   SWR_REGISTRY: swr.cn-east-3.myhuaweicloud.com
-  SWR_ORGANIZATION: danxiaonuo
+  SWR_ORGANIZATION: iflyelf
 ```
 
 配置 Secrets（值取自华为云 SWR 控制台的「登录指令」）：
@@ -61,7 +61,7 @@ gh secret set SWR_AK -b "<AccessKeyId>" -R iflyelf/flyiam
 gh secret set SWR_SK -b "<SecretAccessKey>" -R iflyelf/flyiam
 ```
 
-> 公开后 `docker pull swr.cn-east-3.myhuaweicloud.com/danxiaonuo/flyiam:latest` 无需登录。
+> 公开后 `docker pull swr.cn-east-3.myhuaweicloud.com/iflyelf/flyiam:latest` 无需登录。
 
 ## 3. 触发方式
 
@@ -73,7 +73,7 @@ gh secret set SWR_SK -b "<SecretAccessKey>" -R iflyelf/flyiam
 
 - 容器镜像（amd64/arm64）：
   - Docker Hub：`<DOCKER_USERNAME>/flyiam:latest`、`<DOCKER_USERNAME>/flyiam:latest-<短提交>`
-  - 华为云 SWR：`swr.cn-east-3.myhuaweicloud.com/danxiaonuo/flyiam:latest`、`...:latest-<短提交>`
+  - 华为云 SWR：`swr.cn-east-3.myhuaweicloud.com/iflyelf/flyiam:latest`、`...:latest-<短提交>`
 - GitHub Release（`latest` 标签）二进制：
   - `flyiam-linux-amd64.tar.gz` / `flyiam-linux-arm64.tar.gz`
   - `flyiam-darwin-amd64.tar.gz` / `flyiam-darwin-arm64.tar.gz`
@@ -101,8 +101,8 @@ docker buildx build --platform linux/amd64,linux/arm64 -t iflyelf/flyiam:latest 
 
 # 本地推送到华为云 SWR
 docker login -u cn-east-3@<AccessKeyId> -p <登录密码> swr.cn-east-3.myhuaweicloud.com
-docker tag iflyelf/flyiam:latest swr.cn-east-3.myhuaweicloud.com/danxiaonuo/flyiam:latest
-docker push swr.cn-east-3.myhuaweicloud.com/danxiaonuo/flyiam:latest
+docker tag iflyelf/flyiam:latest swr.cn-east-3.myhuaweicloud.com/iflyelf/flyiam:latest
+docker push swr.cn-east-3.myhuaweicloud.com/iflyelf/flyiam:latest
 
 # 交叉编译二进制（CGO_ENABLED=0，纯静态）
 cd web && npm ci && npm run build && cd ..
