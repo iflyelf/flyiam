@@ -2,6 +2,8 @@ package scheduler
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"runtime/debug"
@@ -18,15 +20,19 @@ import (
 // Scheduler 定时任务调度器
 type Scheduler struct {
 	db sqlx.SqlConn
+	// rawDB 原生连接：用于跨副本同步互斥（advisory lock）
+	rawDB *sql.DB
 	// casdoorFn 运行时获取当前 Casdoor 客户端（支持热重载后自动用新客户端）
 	casdoorFn func() *casdoor.Client
 	baseTick  time.Duration
 }
 
 // New 创建调度器。casdoorFn 在每次执行同步时调用，返回当前生效的客户端。
-func New(db sqlx.SqlConn, casdoorFn func() *casdoor.Client) *Scheduler {
+// rawDB 用于跨副本互斥（多副本部署时避免重复执行同一任务）。
+func New(db sqlx.SqlConn, rawDB *sql.DB, casdoorFn func() *casdoor.Client) *Scheduler {
 	return &Scheduler{
 		db:        db,
+		rawDB:     rawDB,
 		casdoorFn: casdoorFn,
 		baseTick:  time.Minute,
 	}
@@ -94,7 +100,7 @@ func (s *Scheduler) run(ctx context.Context, scheduleLogic *schedule.Logic, cfg 
 	if s.casdoorFn != nil {
 		cd = s.casdoorFn()
 	}
-	syncer := synclogic.NewSyncLogic(s.db, cd, dslogic.NewLogic(s.db))
+	syncer := synclogic.NewSyncLogic(s.db, s.rawDB, cd, dslogic.NewLogic(s.db))
 
 	var runErr error
 	if cfg.SyncDataSource {
@@ -102,6 +108,12 @@ func (s *Scheduler) run(ctx context.Context, scheduleLogic *schedule.Logic, cfg 
 	}
 
 	if runErr != nil {
+		// 另一副本正在执行：属正常跳过，不算失败，也不更新上次执行结果
+		// （避免本副本把时间戳写乱，干扰另一副本的间隔判断）。
+		if errors.Is(runErr, synclogic.ErrSyncRunning) {
+			log.Println("⏭️  已有同步任务在执行（可能为其它副本），本次跳过")
+			return
+		}
 		log.Printf("❌ 定时任务执行失败: %v", runErr)
 		_ = scheduleLogic.UpdateLastRun(ctx, "failed", runErr.Error())
 		return

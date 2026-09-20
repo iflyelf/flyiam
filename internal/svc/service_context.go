@@ -39,6 +39,11 @@ func (s *ServiceContext) Config() *config.Config {
 	return s.cfgStore.Get()
 }
 
+// RawDB 返回原生数据库连接（供需要 advisory lock 等数据库特性的场景使用）。
+func (s *ServiceContext) RawDB() *sql.DB {
+	return s.rawDB
+}
+
 // Casdoor 返回当前 Casdoor 客户端（可能已被热重载替换）
 func (s *ServiceContext) Casdoor() *casdoor.Client {
 	return s.casdoorRef.Load()

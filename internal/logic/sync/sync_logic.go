@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"github.com/iflyelf/flyiam/internal/model"
 	"github.com/iflyelf/flyiam/internal/pkg/casdoor"
 	"github.com/iflyelf/flyiam/internal/pkg/datasource"
+	"github.com/iflyelf/flyiam/internal/pkg/distlock"
 	"github.com/lib/pq"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
@@ -28,18 +30,24 @@ type SyncOptions struct {
 	Concurrency int
 }
 
-// runningGuard 全局同步互斥：同一时刻只允许一个同步任务执行，避免并发冲突
+// runningGuard 进程内同步互斥：同一进程内同一时刻只允许一个同步任务执行
 var runningGuard int32
+
+// syncLockKey 跨副本同步互斥的 advisory lock 键（固定值，保证多副本互斥）
+//
+// 背景：多副本部署时每个副本都有独立调度器，进程内标记无法跨 Pod 生效，
+// 会出现在同一时刻多个副本重复执行同一同步的问题（表现为同时间两条同步日志）。
+const syncLockKey int64 = 0x666C7969616D02 // "flyiam\x02"
 
 // ErrSyncRunning 已有同步任务在执行
 var ErrSyncRunning = fmt.Errorf("已有同步任务正在执行，请稍后再试")
 
-// tryAcquire 尝试获取同步锁
+// tryAcquire 尝试获取进程内同步锁
 func tryAcquire() bool {
 	return atomic.CompareAndSwapInt32(&runningGuard, 0, 1)
 }
 
-// release 释放同步锁
+// release 释放进程内同步锁
 func release() {
 	atomic.StoreInt32(&runningGuard, 0)
 }
@@ -51,14 +59,18 @@ func release() {
 //   - 同步即直接对 Casdoor 做新增/更新/删除
 type SyncLogic struct {
 	db              sqlx.SqlConn
+	rawDB           *sql.DB // 原生连接：用于跨副本 advisory lock
 	casdoorClient   *casdoor.Client
 	datasourceLogic *dslogic.Logic
 }
 
-// NewSyncLogic 创建同步业务逻辑
-func NewSyncLogic(db sqlx.SqlConn, casdoorClient *casdoor.Client, datasourceLogic *dslogic.Logic) *SyncLogic {
+// NewSyncLogic 创建同步业务逻辑。
+//
+// rawDB 用于获取跨副本分布式锁；为 nil 时退化为单副本（进程内）互斥。
+func NewSyncLogic(db sqlx.SqlConn, rawDB *sql.DB, casdoorClient *casdoor.Client, datasourceLogic *dslogic.Logic) *SyncLogic {
 	return &SyncLogic{
 		db:              db,
+		rawDB:           rawDB,
 		casdoorClient:   casdoorClient,
 		datasourceLogic: datasourceLogic,
 	}
@@ -71,6 +83,18 @@ func (l *SyncLogic) SyncFromDataSources(ctx context.Context, opts SyncOptions, t
 		return ErrSyncRunning
 	}
 	defer release()
+
+	// 跨副本互斥：多副本各自调度时，仅允许一个副本真正执行。
+	// advisory lock 绑定专用连接；副本异常退出时连接断开、锁自动释放。
+	lock, ok, lerr := distlock.TryAcquire(ctx, l.rawDB, syncLockKey)
+	if lerr != nil {
+		// 锁服务异常时不阻塞同步（降级为进程内互斥），仅告警
+		log.Printf("⚠️ 获取跨副本同步锁失败（降级为进程内互斥）: %v", lerr)
+	} else if !ok {
+		return ErrSyncRunning
+	} else {
+		defer lock.Release()
+	}
 
 	// panic 兜底：同步在后台 goroutine 中执行，任何 panic 默认会终止整个进程。
 	// 此处捕获并记录堆栈，保证「同步失败」不会拖垮服务。
