@@ -216,10 +216,11 @@ Casdoor 连接配置（`casdoor.endpoint` / `public_endpoint` / `organization` /
 > 通过 `Casdoor()` 访问器读取、`ReloadCasdoor()` 重建替换，切换过程对并发请求安全。
 > 若重建失败（如地址不可达），配置已保存但旧客户端仍继续服务，页面会提示错误。
 
-> **查看 Client Secret**：「系统设置 → Casdoor 连接」中的 `Client Secret` 以密码框呈现，
-> 点击「显示」即可查看明文（其余 secret 仍以 `******` 脱敏、不可查看），便于管理员
-> 复制给 Consul Manager 等外部系统对接。该页面仅管理员可见；外部系统也可通过服务间
-> 接口 `GET /api/casdoor/app-credentials` 自动获取凭据，无需人工转抄。
+> **查看 Client Secret**：「系统设置 → Casdoor 连接」中的 `Client Secret` 默认以
+> **密码框遮蔽**，点击输入框右侧的「眼睛」图标才显示明文（其余 secret 仍以
+> `******` 占位符脱敏、不返回真实值），便于管理员按需查看并复制给 Consul Manager
+> 等外部系统对接。该页面仅管理员可见；外部系统也可通过服务间接口
+> `GET /api/casdoor/app-credentials` 自动获取凭据，无需人工转抄。
 
 ## 3.2 多副本与会话共享（重要）
 

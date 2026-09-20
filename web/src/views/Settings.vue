@@ -60,9 +60,10 @@
               <el-input-number v-else-if="it.type === 'int'" v-model="settingsForm[it.key]" :controls="false" style="width: 220px" />
               <el-input
                 v-else
+                :key="`${it.key}-${loadEpoch}`"
                 v-model="settingsForm[it.key]"
-                :type="isMaskedSecret(it) ? 'password' : 'text'"
-                :show-password="isMaskedSecret(it)"
+                :type="it.secret ? 'password' : 'text'"
+                :show-password="isMaskableSecret(it)"
                 :placeholder="it.secret ? '留空/保持占位符表示不修改' : ''"
                 style="max-width: 420px"
               />
@@ -127,8 +128,13 @@ const groupedSettings = computed(() => {
   return out
 })
 
-// 需以密码框呈现的项：secret 且未标记 reveal（reveal 项明文可见，便于复制对接）
-const isMaskedSecret = (it) => !!it.secret && !it.reveal
+// 是否为「可查看的 secret」：默认以密码框遮蔽，点输入框右侧「眼睛」才显示明文。
+// 所有 secret（含 reveal 项，如 Casdoor Client Secret）统一走密码框，避免明文直显。
+const isMaskableSecret = (it) => !!it.secret
+
+// 每次加载递增，作为输入框 key 的一部分：强制重建组件，
+// 使「眼睛」的显示状态在保存/刷新后复位为遮蔽。
+const loadEpoch = ref(0)
 
 const loadSettings = async () => {
   try {
@@ -139,6 +145,7 @@ const loadSettings = async () => {
       form[it.key] = it.type === 'bool' ? it.value === 'true' : it.value
     }
     settingsForm.value = form
+    loadEpoch.value++ // 复位「眼睛」显示状态
   } catch (e) {
     /* 拦截器已提示 */
   }
