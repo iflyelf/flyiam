@@ -61,8 +61,8 @@
               <el-input
                 v-else
                 v-model="settingsForm[it.key]"
-                :type="it.secret ? 'password' : 'text'"
-                :show-password="it.secret"
+                :type="isMaskedSecret(it) ? 'password' : 'text'"
+                :show-password="isMaskedSecret(it)"
                 :placeholder="it.secret ? '留空/保持占位符表示不修改' : ''"
                 style="max-width: 420px"
               />
@@ -127,6 +127,9 @@ const groupedSettings = computed(() => {
   return out
 })
 
+// 需以密码框呈现的项：secret 且未标记 reveal（reveal 项明文可见，便于复制对接）
+const isMaskedSecret = (it) => !!it.secret && !it.reveal
+
 const loadSettings = async () => {
   try {
     const res = await listSettings()
@@ -144,10 +147,12 @@ const loadSettings = async () => {
 const saveSettings = async () => {
   savingSettings.value = true
   try {
-    // bool 转字符串；secret 占位符 ****** 原样提交（后端识别为保持原值）
+    // bool 转字符串；secret 占位符 ****** 原样提交（后端识别为保持原值）；
+    // 明文可查看的 secret（reveal）留空时跳过，避免误清空（如 Client Secret）。
     const payload = {}
     for (const it of settingsItems.value) {
       const v = settingsForm.value[it.key]
+      if (it.secret && it.reveal && !String(v ?? '')) continue
       payload[it.key] = it.type === 'bool' ? String(!!v) : String(v ?? '')
     }
     await updateSettings(payload)

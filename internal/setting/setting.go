@@ -277,7 +277,7 @@ func (s *Service) View() []map[string]interface{} {
 		}
 		out = append(out, map[string]interface{}{
 			"key": it.Key, "group": it.Group, "label": it.Label,
-			"type": it.Type, "secret": it.Secret, "value": val,
+			"type": it.Type, "secret": it.Secret, "reveal": it.Reveal, "value": val,
 		})
 	}
 	return out

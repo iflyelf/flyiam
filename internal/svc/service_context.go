@@ -54,7 +54,7 @@ func (s *ServiceContext) Casdoor() *casdoor.Client {
 // 触发时机：页面修改 casdoor.* 设置后。重建使用最新配置；
 // 若业务应用凭据为空（自动初始化场景），会重新读取内置应用凭据并补齐。
 func (s *ServiceContext) ReloadCasdoor(ctx context.Context) error {
-	client, err := buildCasdoorClient(s.rawDB, *s.Config(), 5*time.Second)
+	client, effID, effSecret, err := buildCasdoorClient(s.rawDB, *s.Config(), 5*time.Second)
 	if err != nil {
 		return err
 	}
@@ -64,9 +64,37 @@ func (s *ServiceContext) ReloadCasdoor(ctx context.Context) error {
 		}
 	}
 	s.casdoorRef.Store(client)
+	s.persistBackfilledCredentials(ctx, effID, effSecret)
 	log.Printf("🔄 Casdoor 客户端已热重载（endpoint=%s，organization=%s）",
 		s.Config().Casdoor.Endpoint, s.Config().Casdoor.OrganizationName)
 	return nil
+}
+
+// persistBackfilledCredentials 将自动初始化回填的应用凭据写回配置与数据库。
+//
+// 背景：EnsureSetup 自动创建/补齐应用时会生成或读取 ClientId/ClientSecret，
+// 但那只作用于局部配置；若不回写，设置页的「Client Secret」将显示为空，
+// 且重启后也无法从配置恢复。此处仅在凭据确实变化时回写（含落库，持久化）。
+func (s *ServiceContext) persistBackfilledCredentials(ctx context.Context, clientId, clientSecret string) {
+	if s.Settings == nil || (clientId == "" && clientSecret == "") {
+		return
+	}
+	cur := s.Config()
+	kv := map[string]string{}
+	if clientId != "" && clientId != cur.Casdoor.ClientId {
+		kv["casdoor.client_id"] = clientId
+	}
+	if clientSecret != "" && clientSecret != cur.Casdoor.ClientSecret {
+		kv["casdoor.client_secret"] = clientSecret
+	}
+	if len(kv) == 0 {
+		return
+	}
+	if _, err := s.Settings.Apply(ctx, kv); err != nil {
+		log.Printf("⚠️ 回写 Casdoor 应用凭据失败: %v", err)
+		return
+	}
+	log.Printf("💾 已回写 Casdoor 应用凭据到配置（clientId=%s）", clientId)
 }
 
 // CookieConfig 返回登录 Cookie 配置（来自 config.Security）
@@ -104,8 +132,9 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 		log.Fatalf("❌ Casdoor 配置校验失败: %v", err)
 	}
 
-	// 初始化 Casdoor 客户端（含自动初始化组织/应用/管理员）
-	casdoorClient, err := initCasdoorClient(db, *svcCfg)
+	// 初始化 Casdoor 客户端（含自动初始化组织/应用/管理员）。
+	// effClientId/effClientSecret 为最终生效凭据（AutoSetup 可能自动创建并回填）。
+	casdoorClient, effClientId, effClientSecret, err := initCasdoorClient(db, *svcCfg)
 	if err != nil {
 		log.Fatalf("❌ 初始化 Casdoor 客户端失败: %v", err)
 	}
@@ -141,6 +170,8 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 		ProtectedLogic: protectedLogic,
 	}
 	svcCtx.casdoorRef.Store(casdoorClient)
+	// 回写自动初始化生成/补齐的应用凭据，使设置页可显示、重启后可恢复
+	svcCtx.persistBackfilledCredentials(context.Background(), effClientId, effClientSecret)
 	return svcCtx
 }
 
@@ -679,8 +710,9 @@ func createAuditLogsTable(db *sql.DB) error {
 	return err
 }
 
-// initCasdoorClient 初始化 Casdoor 客户端（启动时，等待就绪最长 60s）
-func initCasdoorClient(db *sql.DB, c config.Config) (*casdoor.Client, error) {
+// initCasdoorClient 初始化 Casdoor 客户端（启动时，等待就绪最长 60s）。
+// 返回客户端及最终生效的应用凭据（自动初始化可能回填凭据）。
+func initCasdoorClient(db *sql.DB, c config.Config) (*casdoor.Client, string, string, error) {
 	return buildCasdoorClient(db, c, 60*time.Second)
 }
 
@@ -691,8 +723,12 @@ func initCasdoorClient(db *sql.DB, c config.Config) (*casdoor.Client, error) {
 //  2. 若开启 AutoSetup 且服务可用，自动创建/补齐组织、应用、管理员，并回填应用凭据
 //  3. 使用最终凭据创建客户端并做健康检查
 //
+// 返回值中的 effClientId/effClientSecret 为**最终生效**的应用凭据：当启用
+// AutoSetup 时可能由 Casdoor 自动创建并回填（与入参不同），调用方应回写配置，
+// 否则页面「Client Secret」将显示为空。
+//
 // waitTimeout：等待 Casdoor 就绪的最长时间（启动 60s；热重载用较短值）。
-func buildCasdoorClient(db *sql.DB, c config.Config, waitTimeout time.Duration) (*casdoor.Client, error) {
+func buildCasdoorClient(db *sql.DB, c config.Config, waitTimeout time.Duration) (*casdoor.Client, string, string, error) {
 	cfg := &casdoor.Config{
 		Endpoint:                c.Casdoor.Endpoint,
 		PublicEndpoint:          c.Casdoor.PublicEndpoint,
@@ -734,7 +770,7 @@ func buildCasdoorClient(db *sql.DB, c config.Config, waitTimeout time.Duration) 
 	}
 
 	if cfg.ClientId == "" || cfg.ClientSecret == "" {
-		return nil, fmt.Errorf("Casdoor 应用凭据缺失：请开启 CASDOOR_AUTO_SETUP 或在配置中提供 CASDOOR_CLIENT_ID/SECRET")
+		return nil, "", "", fmt.Errorf("Casdoor 应用凭据缺失：请开启 CASDOOR_AUTO_SETUP 或在配置中提供 CASDOOR_CLIENT_ID/SECRET")
 	}
 
 	// 读取内置应用（app-built-in）凭据，用于「应用 / 组织管理」等全局接口。
@@ -749,7 +785,7 @@ func buildCasdoorClient(db *sql.DB, c config.Config, waitTimeout time.Duration) 
 
 	client, err := casdoor.NewClient(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("创建 Casdoor 客户端失败: %w", err)
+		return nil, "", "", fmt.Errorf("创建 Casdoor 客户端失败: %w", err)
 	}
 
 	// 注入补读方式 + 后台自动重试：Casdoor 首次建表可能晚于本服务，
@@ -769,7 +805,7 @@ func buildCasdoorClient(db *sql.DB, c config.Config, waitTimeout time.Duration) 
 		log.Printf("✅ Casdoor 客户端初始化成功: %s", c.Casdoor.Endpoint)
 	}
 
-	return client, nil
+	return client, cfg.ClientId, cfg.ClientSecret, nil
 }
 
 // waitForCasdoor 轮询等待 Casdoor 就绪（容器编排下 Casdoor 可能晚于本服务启动）
