@@ -102,6 +102,36 @@ flyiam/
 前端构建产物输出到 `internal/pkg/web/dist`，通过 `//go:embed` 打包进二进制，
 部署仅需一个进程、一个端口。
 
+### 4.6 多副本与并发安全
+
+**多副本（默认 2 副本）下的定时同步去重**
+
+每个副本都有独立调度器，进程内的 `atomic` 标记无法跨 Pod 互斥，会导致
+「同一时刻多个副本各跑一遍同步」。为此同步执行前通过
+`internal/pkg/distlock`（PostgreSQL 会话级 advisory lock）获取**全局锁**：
+
+- 抢到锁的副本执行，其余副本直接跳过（返回 `ErrSyncRunning`，视为正常，不计失败）；
+- 锁绑定专用连接，副本异常退出时连接断开、锁自动释放，不会死锁；
+- 获取连接带 10s 超时；锁服务异常时降级为进程内互斥（仅告警，不阻塞同步）。
+
+**配置的并发安全（原子快照）**
+
+`Config` 由 `internal/config.Store`（`atomic.Pointer[Config]`）承载，采用
+**写时复制**：页面保存设置时先 `Clone()` 副本、在副本上修改，再原子替换。
+读者经 `ServiceContext.Config()` 获取**不可变快照**，从而消除「页面保存」与
+「请求读取」并发的数据竞争。`Clone` 用 JSON 序列化往返实现，自动覆盖全部字段。
+
+**后台任务的 panic 兜底**
+
+所有后台 goroutine（调度器、同步 worker、令牌异步更新、凭据补读等）均加
+`recover`：Go 的 `recover` 仅对**同 goroutine** 有效，worker 池 / 后台循环
+内一旦 panic 会终止整个进程，故须逐处兜底。
+
+**配置热重载**
+
+Casdoor 连接配置变更后原子重建客户端（`atomic.Pointer[casdoor.Client]`），
+无需重启；`casdoorsdk.SetHttpClient` 用 `sync.Once` 只注入一次。
+
 ## 5. 请求链路
 
 ```

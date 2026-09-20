@@ -6,8 +6,7 @@
 
 ```
 docker-compose.yml               # 编排文件（含内置 Casdoor）
-Dockerfile                       # 多阶段构建（前端 + 后端）
-deploy/docker/Dockerfile         # 同上（备用路径）
+Dockerfile                       # 多阶段构建（构建用 ubuntu:latest，运行用 ubuntu:lite）
 deploy/sql/schema.sql            # 数据库 DDL（参考）
 ```
 
@@ -77,6 +76,15 @@ docker compose down -v         # 停止并删除数据卷
 ```
 
 ## 8. 构建自定义镜像
+
+Dockerfile 采用**多阶段构建**：
+
+| 阶段 | 基础镜像 | 作用 |
+|------|----------|------|
+| builder | `iflyelf/ubuntu:latest` | 预装 Go / Node / Python 与工具链；编译前端 + 交叉编译 Go 二进制 |
+| runtime | `iflyelf/ubuntu:lite` | 精简运行镜像，仅拷贝编译产物与默认配置 |
+
+基础镜像可用 `--build-arg BUILDER_IMAGE=... --build-arg RUNTIME_IMAGE=...` 覆盖。
 
 ```bash
 # 多架构构建（amd64 / arm64）
