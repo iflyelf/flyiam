@@ -25,6 +25,9 @@ type Item struct {
 	Label  string
 	Type   string // string / int / bool / list / secret
 	Secret bool
+	// Reveal 为 true 时，View 返回明文（不脱敏），供管理员查看/复制（如
+	// Casdoor Client Secret 需交给其它系统对接）。默认 false 以保持脱敏。
+	Reveal bool
 	Get    func(*config.Config) string
 	Set    func(*config.Config, string)
 }
@@ -125,7 +128,7 @@ var Registry = []Item{
 	{Key: "casdoor.client_id", Group: "Casdoor 连接", Label: "Client ID", Type: "string",
 		Get: func(c *config.Config) string { return c.Casdoor.ClientId },
 		Set: func(c *config.Config, v string) { c.Casdoor.ClientId = v }},
-	{Key: "casdoor.client_secret", Group: "Casdoor 连接", Label: "Client Secret", Type: "secret", Secret: true,
+	{Key: "casdoor.client_secret", Group: "Casdoor 连接", Label: "Client Secret", Type: "secret", Secret: true, Reveal: true,
 		Get: func(c *config.Config) string { return c.Casdoor.ClientSecret },
 		Set: func(c *config.Config, v string) { c.Casdoor.ClientSecret = v }},
 	{Key: "casdoor.default_password", Group: "Casdoor 连接", Label: "默认密码", Type: "secret", Secret: true,
@@ -260,13 +263,16 @@ func NeedsCasdoorReload(applied []string) bool {
 	return false
 }
 
-// View 返回全部可配置项（含当前值；secret 以占位符返回）
+// View 返回全部可配置项（含当前值）。
+//
+// 脱敏规则：secret 项默认以占位符返回；标记 Reveal 的项返回明文
+// （前端仍以密码框呈现，管理员可点击「显示」查看，兼顾防肩窥与可复制）。
 func (s *Service) View() []map[string]interface{} {
 	cfg := s.store.Get()
 	out := make([]map[string]interface{}, 0, len(Registry))
 	for _, it := range Registry {
 		val := it.Get(cfg)
-		if it.Secret && val != "" {
+		if it.Secret && !it.Reveal && val != "" {
 			val = "******"
 		}
 		out = append(out, map[string]interface{}{

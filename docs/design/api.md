@@ -145,6 +145,16 @@ GET /api/user/stats
 > 说明：外部系统（如 Consul Manager）可复用上述只读接口获取用户与组织信息；
 > 生产环境建议为外部系统单独分配只读账号并按最小权限授权。
 
+### 11.1 服务间接口（需服务令牌）
+
+以下接口需携带 `X-Service-Token`（或 `Authorization: Bearer`），凭证为
+页面「API 令牌」生成的令牌，或环境变量 `SERVICE_TOKEN`：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/user-fields/export` | 导出用户字段定义（供外部系统同步） |
+| GET | `/api/casdoor/app-credentials` | 返回本系统 Casdoor 应用凭据（clientId/clientSecret），供外部系统自动接入，免手工填写 |
+
 ## 12. 错误码
 
 | code | 含义 |

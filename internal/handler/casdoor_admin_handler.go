@@ -349,3 +349,45 @@ func normalizeList(items []string) []string {
 	}
 	return out
 }
+
+// AppCredentialsHandler 返回本系统 Casdoor 应用的连接凭据（供可信服务自动接入）。
+//
+// 用途：Consul Manager 等外部服务与 FlyIAM 复用同一 Casdoor，但无法自行获取
+// 应用凭据；此接口让其用服务令牌自动获取，免去手工填写 ClientID/Secret。
+//
+// 安全：仅允许 ServiceAuth（用户 API 令牌 / SERVICE_TOKEN）访问，且只返回
+// 当前配置的应用（不接受任意 application 参数），避免密钥被越权读取。
+func AppCredentialsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svcCtx.Casdoor() == nil {
+			fail(w, http.StatusServiceUnavailable, "Casdoor 未初始化")
+			return
+		}
+		cfg := svcCtx.Config()
+		appName := cfg.Casdoor.ApplicationName
+		if appName == "" {
+			fail(w, http.StatusBadRequest, "未配置 Casdoor 应用名")
+			return
+		}
+		app, err := svcCtx.Casdoor().GetApplication(appName)
+		if err != nil {
+			fail(w, http.StatusBadGateway, "读取 Casdoor 应用失败: "+err.Error())
+			return
+		}
+		if app == nil {
+			fail(w, http.StatusNotFound, "Casdoor 应用不存在: "+appName)
+			return
+		}
+		if app.ClientId == "" || app.ClientSecret == "" {
+			fail(w, http.StatusBadGateway, "应用凭据不完整（请确认 Casdoor 应用已初始化）")
+			return
+		}
+		ok(w, map[string]string{
+			"endpoint":     cfg.Casdoor.Endpoint,
+			"organization": cfg.Casdoor.OrganizationName,
+			"application":  appName,
+			"clientId":     app.ClientId,
+			"clientSecret": app.ClientSecret,
+		})
+	}
+}
