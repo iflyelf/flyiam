@@ -153,6 +153,8 @@ GET /api/user/stats
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/user-fields/export` | 导出用户字段定义（供外部系统同步） |
+| GET | `/api/users/export` | 导出用户（`page` / `pageSize` 分页，响应头 `X-Total-Count` 为总数） |
+| GET | `/api/departments/export` | 导出组织树（从用户 `deptIdLv0/1/2`、`deptNameLv0/1/2` 属性推导，含人数） |
 | GET | `/api/casdoor/app-credentials` | 返回本系统 Casdoor 应用凭据（clientId/clientSecret），供外部系统自动接入，免手工填写 |
 
 ## 12. 错误码

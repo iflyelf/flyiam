@@ -56,8 +56,10 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/user-fields", Handler: perm("userfield:write")(CreateUserFieldHandler(svcCtx))},
 		{Method: http.MethodPut, Path: "/api/user-fields/:id", Handler: perm("userfield:write")(UpdateUserFieldHandler(svcCtx))},
 		{Method: http.MethodDelete, Path: "/api/user-fields/:id", Handler: perm("userfield:write")(DeleteUserFieldHandler(svcCtx))},
-		// 服务间导出（供 Consul Manager 等同步字段定义，需 API 令牌或 SERVICE_TOKEN）
+		// 服务间导出（供 Consul Manager 等同步字段定义/用户/组织，需 API 令牌或 SERVICE_TOKEN）
 		{Method: http.MethodGet, Path: "/api/user-fields/export", Handler: middleware.ServiceAuth(svcCtx)(ListUserFieldsHandler(svcCtx))},
+		{Method: http.MethodGet, Path: "/api/users/export", Handler: middleware.ServiceAuth(svcCtx)(ExportUsersHandler(svcCtx))},
+		{Method: http.MethodGet, Path: "/api/departments/export", Handler: middleware.ServiceAuth(svcCtx)(ExportDepartmentsHandler(svcCtx))},
 		// 服务间获取 Casdoor 应用凭据（供 Consul Manager 等自动接入，需服务令牌）
 		{Method: http.MethodGet, Path: "/api/casdoor/app-credentials", Handler: middleware.ServiceAuth(svcCtx)(AppCredentialsHandler(svcCtx))},
 
