@@ -67,6 +67,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodGet, Path: "/api/tokens", Handler: perm("setting:read")(ListTokensHandler(svcCtx))},
 		{Method: http.MethodPost, Path: "/api/tokens", Handler: perm("setting:write")(CreateTokenHandler(svcCtx))},
 		{Method: http.MethodDelete, Path: "/api/tokens/:id", Handler: perm("setting:write")(RevokeTokenHandler(svcCtx))},
+		{Method: http.MethodPost, Path: "/api/tokens/batch-delete", Handler: perm("setting:write")(BatchDeleteTokensHandler(svcCtx))},
 
 		// 应用设置（页面可配置，DB 优先 / env 兜底）
 		{Method: http.MethodGet, Path: "/api/settings", Handler: perm("setting:read")(ListSettingsHandler(svcCtx))},

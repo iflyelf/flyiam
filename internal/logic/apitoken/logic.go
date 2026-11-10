@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 
 	"github.com/iflyelf/flyiam/internal/model"
@@ -99,6 +100,29 @@ func (l *Logic) Revoke(ctx context.Context, id int64, username string) error {
 		return fmt.Errorf("吊销令牌失败: %w", err)
 	}
 	return nil
+}
+
+// BatchDelete 批量删除令牌（仅限本人），返回实际删除数量。
+//
+// 与 Revoke 语义一致：只删除 username 名下的令牌，避免越权删除他人令牌。
+func (l *Logic) BatchDelete(ctx context.Context, ids []int64, username string) (int64, error) {
+	if len(ids) == 0 {
+		return 0, fmt.Errorf("未选择要删除的令牌")
+	}
+	if len(ids) > 200 {
+		return 0, fmt.Errorf("一次最多删除 200 个令牌")
+	}
+	res, err := l.db.ExecCtx(ctx,
+		`DELETE FROM api_tokens WHERE id = ANY($1) AND username = $2`,
+		pq.Array(ids), username)
+	if err != nil {
+		return 0, fmt.Errorf("批量删除令牌失败: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, nil
+	}
+	return n, nil
 }
 
 // lastUsedSem 限制「异步更新最后使用时间」的并发 goroutine 数。

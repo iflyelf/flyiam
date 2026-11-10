@@ -69,3 +69,25 @@ func RevokeTokenHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		ok(w, nil)
 	}
 }
+
+// BatchDeleteTokensHandler 批量删除 API 令牌（仅限本人）
+//
+// 入参：{ ids: [1,2,3] }；返回 { deleted: N }。
+func BatchDeleteTokensHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		username := middleware.Username(r.Context())
+		var req struct {
+			IDs []int64 `json:"ids"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			fail(w, http.StatusBadRequest, "参数解析失败: "+err.Error())
+			return
+		}
+		deleted, err := apitoken.NewLogic(svcCtx.DB).BatchDelete(r.Context(), req.IDs, username)
+		if err != nil {
+			fail(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		ok(w, map[string]interface{}{"deleted": deleted})
+	}
+}

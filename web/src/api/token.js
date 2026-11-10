@@ -14,3 +14,8 @@ export function createToken(data) {
 export function revokeToken(id) {
   return request.delete(`/api/tokens/${id}`)
 }
+
+// 批量删除令牌（仅本人）
+export function batchDeleteTokens(ids) {
+  return request.post('/api/tokens/batch-delete', { ids })
+}

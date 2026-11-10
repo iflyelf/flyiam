@@ -7,7 +7,18 @@
             <span>API 令牌</span>
             <el-tag type="info" size="small">供其它系统调用本系统接口（如 Consul Manager 同步字段定义）</el-tag>
           </div>
-          <el-button type="primary" :icon="Plus" @click="openCreate">生成令牌</el-button>
+          <div class="actions">
+            <el-button
+              type="danger"
+              plain
+              :icon="Delete"
+              :disabled="!selection.length"
+              @click="handleBatchDelete"
+            >
+              批量删除{{ selection.length ? `（${selection.length}）` : '' }}
+            </el-button>
+            <el-button type="primary" :icon="Plus" @click="openCreate">生成令牌</el-button>
+          </div>
         </div>
       </template>
 
@@ -19,7 +30,14 @@
         style="margin-bottom: 12px"
       />
 
-      <el-table :data="list" v-loading="loading" stripe>
+      <el-table
+        ref="tableRef"
+        :data="list"
+        v-loading="loading"
+        stripe
+        @selection-change="onSelectionChange"
+      >
+        <el-table-column type="selection" width="48" />
         <el-table-column prop="name" label="名称" min-width="140" />
         <el-table-column prop="tokenPrefix" label="令牌前缀" min-width="160">
           <template #default="{ row }"><code class="key">{{ row.tokenPrefix }}</code></template>
@@ -77,7 +95,7 @@
     <el-dialog v-model="resultVisible" title="令牌已生成" width="560px">
       <el-alert type="error" :closable="false" show-icon
         title="请立即复制保存，关闭后将无法再次查看。" style="margin-bottom: 12px" />
-      <el-input v-model="createdToken" readonly>
+      <el-input ref="tokenInputRef" v-model="createdToken" readonly>
         <template #append>
           <el-button :icon="CopyDocument" @click="copyToken">复制</el-button>
         </template>
@@ -90,20 +108,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, CopyDocument } from '@element-plus/icons-vue'
-import { listTokens, createToken, revokeToken } from '@/api/token'
+import { Plus, CopyDocument, Delete } from '@element-plus/icons-vue'
+import { listTokens, createToken, revokeToken, batchDeleteTokens } from '@/api/token'
 
 const loading = ref(false)
 const saving = ref(false)
 const list = ref([])
+const tableRef = ref(null)
+const selection = ref([])
 
 const formVisible = ref(false)
 const form = ref({ name: '', expiresInDays: 0 })
 
 const resultVisible = ref(false)
 const createdToken = ref('')
+const tokenInputRef = ref(null)
 
 const fmt = (v) => {
   if (!v) return '-'
@@ -120,6 +141,9 @@ const load = async () => {
   try {
     const res = await listTokens()
     list.value = res.data || []
+    selection.value = []
+    // 数据刷新后清空表格勾选，避免残留已删除行导致批量操作数量不准。
+    tableRef.value?.clearSelection()
   } finally {
     loading.value = false
   }
@@ -145,19 +169,75 @@ const handleCreate = async () => {
     }
     formVisible.value = false
     resultVisible.value = true
+    // 打开弹窗后自动全选令牌，复制失败时用户可直接 Ctrl+C。
+    nextTick(() => tokenInputRef.value?.select?.())
     load()
   } finally {
     saving.value = false
   }
 }
 
-const copyToken = async () => {
+const onSelectionChange = (rows) => {
+  selection.value = rows
+}
+
+// copyText 兼容 HTTP 部署：navigator.clipboard 仅在安全上下文（HTTPS / localhost）可用，
+// 内网 http:// 访问时必须回退到 textarea + execCommand，否则「复制」按钮形同虚设。
+const copyText = async (text) => {
+  if (!text) return false
   try {
-    await navigator.clipboard.writeText(createdToken.value)
-    ElMessage.success('已复制到剪贴板')
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
   } catch (e) {
-    ElMessage.warning('复制失败，请手动选择复制')
+    // 继续尝试降级方案
   }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'
+    ta.style.top = '-1000px'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    ta.setSelectionRange(0, ta.value.length)
+    const done = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return done
+  } catch (e) {
+    return false
+  }
+}
+
+const copyToken = async () => {
+  const ok = await copyText(createdToken.value)
+  if (ok) {
+    ElMessage.success('已复制到剪贴板')
+    return
+  }
+  // 复制失败时自动选中文本，方便直接 Ctrl+C。
+  tokenInputRef.value?.select?.()
+  ElMessage.warning('复制失败，令牌已选中，请按 Ctrl+C 手动复制')
+}
+
+const handleBatchDelete = async () => {
+  if (!selection.value.length) return
+  const names = selection.value.map((r) => r.name || r.tokenPrefix).slice(0, 3).join('、')
+  const more = selection.value.length > 3 ? ' 等' : ''
+  try {
+    await ElMessageBox.confirm(
+      `确定删除选中的 ${selection.value.length} 个令牌（${names}${more}）吗？删除后立即失效。`,
+      '批量删除',
+      { type: 'warning' }
+    )
+  } catch (e) {
+    return
+  }
+  const res = await batchDeleteTokens(selection.value.map((r) => r.id))
+  ElMessage.success(`已删除 ${res.data?.deleted ?? 0} 个令牌`)
+  load()
 }
 
 const handleRevoke = async (row) => {
@@ -177,5 +257,6 @@ onMounted(load)
 <style scoped>
 .card-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
 .title { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+.actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .key { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
 </style>
